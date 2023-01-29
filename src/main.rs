@@ -3,8 +3,11 @@ use axum::{
     routing::get,
     Router
 };
+use std::sync::Arc;
 
-use fotos_backend::{APPNAME, handlers};
+use fotos_backend::{handlers, AppState};
+
+static APPNAME : &str = "foto_backend";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -14,8 +17,12 @@ async fn main() -> anyhow::Result<()> {
         .unwrap();
     println!("Load config {}", cfg_path.to_str().unwrap_or(""));
 
+    let app_conf : AppState = confy::load(APPNAME, None)?;
+    let shared_state = Arc::new(app_conf);
+
     let app = Router::new()
-    .route("/", get(handlers::list_folder));
+        .route("/", get(handlers::list_folder))
+        .with_state(shared_state);
 
     // FIXME: make host and port configurable
     // run it with hyper on localhost:3000

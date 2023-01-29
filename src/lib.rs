@@ -2,14 +2,12 @@ use serde::{Serialize, Deserialize};
 
 pub mod handlers;
 
-pub static APPNAME : &str = "foto_backend";
-
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AppConf {
+pub struct AppState {
     pub root: String
 }
 
-impl Default for AppConf {
+impl Default for AppState {
     fn default() -> Self {
         Self { root: "./data".to_string() }
     }
