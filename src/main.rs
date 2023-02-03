@@ -12,6 +12,7 @@ static APPNAME : &str = "foto_backend";
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // FIXME: add cli parameters for verbose
+    // FIXME: add linter to the project
 
     let cfg_path = confy::get_configuration_file_path(APPNAME, None)
         .unwrap();
@@ -22,6 +23,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/*subpath", get(handlers::folder_list))
+        .route("/", get(handlers::folder_list))
         .with_state(shared_state);
 
     // FIXME: make host and port configurable
