@@ -53,7 +53,7 @@ pub async fn folder_list(
 
 #[cfg(test)]
 mod tests {
-    use std::{env, sync::Arc, ops::DerefMut};
+    use std::{env, sync::Arc};
     use axum::{extract::{State, self}, http::StatusCode};
     use crate::AppState;
 
