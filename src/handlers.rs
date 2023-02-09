@@ -53,19 +53,15 @@ pub async fn folder_list(
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use std::fs;
+    use std::{env, sync::Arc, ops::DerefMut};
+    use axum::{extract::{State, self}, http::StatusCode};
+    use crate::AppState;
 
     #[tokio::test]
     async fn get_children_test() {
-        let root = Path::new(".")
-            .join(std::file!())
-            .parent().unwrap()
+        let root = env::current_dir()
+            .unwrap()
             .join("data");
-        println!("{}", std::file!());
-        println!("{:?}", root);
-        println!("{}", fs::canonicalize(".").unwrap().to_str().unwrap());
-        let root = fs::canonicalize(root).unwrap();
 
         let mut actual = super::get_children(root.to_str().unwrap(), None)
             .await.unwrap();
@@ -78,5 +74,51 @@ mod tests {
         ];
 
         assert_eq!(actual, expected);
+    }
+
+    fn make_state() -> State<Arc<AppState>> {
+        let root = env::current_dir()
+            .unwrap()
+            .join("data");
+        let root = root.to_str().unwrap();
+
+        State(Arc::new(AppState { root: root.to_string() }))
+    }
+
+    #[tokio::test]
+    async fn folder_return_type_test() {
+        // if the path is a folder the endpoint will return a json
+        let state = make_state();
+        let subpath = extract::Path("folder".to_string());
+
+        let response = super::folder_list(state, Some(subpath)).await.unwrap();
+        let content_type = response.headers().get("Content-Type").unwrap();
+
+        assert_eq!(content_type.to_str().unwrap(), "application/json");
+    }
+
+    #[tokio::test]
+    async fn file_return_type_test() {
+        // if the path is a file the endpoint will return the content of the file
+        let state = make_state();
+        let subpath = extract::Path("penguins.jpg".to_string());
+
+        let response = super::folder_list(state, Some(subpath)).await.unwrap();
+        let content_type = response.headers().get("Content-Type").unwrap();
+
+        assert_eq!(content_type.to_str().unwrap(), "image/jpeg");
+    }
+
+    #[tokio::test]
+    async fn not_exists_return_type_test() {
+        // if the path doesn't exist the endpoint will return a 404 error code
+        let state = make_state();
+        let subpath = extract::Path("not_exists".to_string());
+
+        let result = super::folder_list(state, Some(subpath)).await;
+        assert!(result.is_err());
+
+        let status = result.unwrap_err();
+        assert_eq!(status, StatusCode::from_u16(404).unwrap());
     }
 }
