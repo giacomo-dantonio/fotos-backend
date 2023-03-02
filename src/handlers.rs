@@ -47,18 +47,23 @@ pub async fn folder_list(
     let children = get_children(&cfg.root, subpath).await;
     match children {
         Ok(children) => Ok(Json(children).into_response()),
-        Err(_) => Err(StatusCode::BAD_REQUEST)
+        Err(_) => Err(StatusCode::NOT_FOUND)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{env, sync::Arc};
-    use axum::{extract::{State, self}, http::StatusCode};
+    use bytes::Bytes;
+    use http_body::combinators::UnsyncBoxBody;
+    use std::{env, sync::Arc, vec};
+    use axum::{extract::{State, self}, http::StatusCode, body::{HttpBody}};
     use crate::AppState;
+    use ring::digest::{Context, Digest, SHA256};
+    use ring::test;
 
     #[tokio::test]
     async fn get_children_test() {
+        // the get_children function returns the filenames in the given folder
         let root = env::current_dir()
             .unwrap()
             .join("data");
@@ -104,9 +109,36 @@ mod tests {
         let subpath = extract::Path("penguins.jpg".to_string());
 
         let response = super::folder_list(state, Some(subpath)).await.unwrap();
-        let content_type = response.headers().get("Content-Type").unwrap();
-
+        let content_type = response.headers().get("Content-Type").cloned().unwrap();
         assert_eq!(content_type.to_str().unwrap(), "image/jpeg");
+    }
+
+    async fn sha256_digest(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> anyhow::Result<Digest> {
+        let mut context = Context::new(&SHA256);
+
+        while let Some(bytes) = body.data().await {
+            let bytes = bytes.unwrap();
+            context.update(bytes.as_ref())
+        }
+
+        Ok(context.finish())
+    }
+
+    #[tokio::test]
+    async fn file_return_checksum_test() {
+        // if the path is a file the endpoint will return the content of the file
+        let state = make_state();
+        let subpath = extract::Path("penguins.jpg".to_string());
+
+        let mut response = super::folder_list(state, Some(subpath)).await.unwrap();
+
+        let body = response.body_mut();
+        let actual_hash = sha256_digest(body).await.unwrap();
+
+        let expected_hash = "382AD1ABC24D92D8941A38CA3B8B3A2AF9B616D13347F10361C3790D4C78C7E7";
+        let expected_hash = test::from_hex(expected_hash).unwrap();
+
+        assert_eq!(&expected_hash, actual_hash.as_ref());
     }
 
     #[tokio::test]
