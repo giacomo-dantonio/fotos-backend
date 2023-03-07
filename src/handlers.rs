@@ -1,17 +1,21 @@
 use crate::AppState;
 
 use anyhow::{anyhow, Result};
-use axum::Json;
-use axum::extract::{self, State};
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
+use axum::{
+    body::StreamBody,
+    extract::{self, State},
+    http::{StatusCode, header},
+    Json,
+    response::{IntoResponse, Response}
+};
 use tokio_stream::StreamExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tokio_stream::wrappers::ReadDirStream;
+use tokio_util::io::ReaderStream;
 
-async fn get_children(root: &str, subpath: Option<&str>) -> Result<Vec<String>>
+fn make_fullpath(root: &str, subpath: Option<&str>) -> Result<PathBuf>
 {
     let mut fullpath = Path::new(root).to_path_buf();
     if let Some(subpath) = subpath {
@@ -19,24 +23,56 @@ async fn get_children(root: &str, subpath: Option<&str>) -> Result<Vec<String>>
     }
 
     if fullpath.exists() {
-        let entries = fs::read_dir(&fullpath).await?;
-        let mut entries = ReadDirStream::new(entries);
-
-        let mut result = vec![];
-        while let Some(entry) = entries.next().await {
-            if let Ok(entry) = entry {
-                let filename = entry.file_name().to_str()
-                    .ok_or(anyhow!("Encoding issue"))?
-                    .to_string();
-                result.push(filename);
-            }
-        }
-
-        Ok(result)
+        Ok(fullpath)
     }
     else {
         Err(anyhow!("path {} doesn't exist", fullpath.to_str().unwrap_or("")))
     }
+}
+
+async fn is_dir(path: &PathBuf) -> Result<bool>
+{
+    let metadata = fs::metadata(path).await?;
+    Ok(metadata.is_dir())
+}
+
+async fn get_folder_entries(fullpath: &PathBuf) -> std::result::Result<Vec<String>, anyhow::Error> {
+    let entries = fs::read_dir(fullpath).await?;
+    let mut entries = ReadDirStream::new(entries);
+
+    let mut result = vec![];
+    while let Some(entry) = entries.next().await {
+        if let Ok(entry) = entry {
+            let filename = entry.file_name().to_str()
+                .ok_or(anyhow!("Encoding issue"))?
+                .to_string();
+            result.push(filename);
+        }
+    }
+
+    Ok(result)
+}
+
+async fn get_file_stream(fullpath: &PathBuf) -> std::result::Result<impl IntoResponse, anyhow::Error> {
+    // Based on https://github.com/tokio-rs/axum/discussions/608
+
+    // `File` implements `AsyncRead`
+    let file = tokio::fs::File::open(fullpath).await?;
+
+    let headers = [
+        (header::CONTENT_TYPE, "application/octet-stream"),
+        (
+            header::CONTENT_DISPOSITION,
+            "attachment; filename=\"penguins.jpg\"",
+        ),
+    ];
+
+    // convert the `AsyncRead` into a `Stream`
+    let stream = ReaderStream::new(file);
+    // convert the `Stream` into an `axum::body::HttpBody`
+    let body = StreamBody::new(stream);
+
+    Ok((headers, body))
 }
 
 pub async fn folder_list(
@@ -44,11 +80,22 @@ pub async fn folder_list(
     subpath: Option<extract::Path<String>>) -> Result<Response, StatusCode> {
 
     let subpath = subpath.as_ref().map(|p| p.as_str());
-    let children = get_children(&cfg.root, subpath).await;
-    match children {
-        Ok(children) => Ok(Json(children).into_response()),
-        Err(_) => Err(StatusCode::NOT_FOUND)
+    let fullpath = make_fullpath(&cfg.root, subpath)
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+
+    let is_dir = is_dir(&fullpath).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let result: Result<Response>;
+    if is_dir {
+        result = get_folder_entries(&fullpath).await
+            .map(|children| Json(children).into_response());
     }
+    else {
+        result = get_file_stream(&fullpath).await
+            .map(|stream| stream.into_response());
+    }
+
+    result.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 #[cfg(test)]
@@ -62,13 +109,14 @@ mod tests {
     use ring::test;
 
     #[tokio::test]
-    async fn get_children_test() {
-        // the get_children function returns the filenames in the given folder
+    async fn get_folder_entries_test() {
+        // the get_folder_entries function returns the filenames in the given folder
         let root = env::current_dir()
             .unwrap()
             .join("data");
 
-        let mut actual = super::get_children(root.to_str().unwrap(), None)
+        let fullpath = super::make_fullpath(root.to_str().unwrap(), None).unwrap();
+        let mut actual = super::get_folder_entries(&fullpath)
             .await.unwrap();
         actual.sort();
 
@@ -152,5 +200,11 @@ mod tests {
 
         let status = result.unwrap_err();
         assert_eq!(status, StatusCode::from_u16(404).unwrap());
+    }
+
+    #[tokio::test]
+    async fn file_download_name_test() {
+        // if the path is a file the browser will download the file with the correct name
+        unimplemented!()
     }
 }
