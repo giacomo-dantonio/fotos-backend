@@ -15,6 +15,9 @@ use tokio::fs;
 use tokio_stream::wrappers::ReadDirStream;
 use tokio_util::io::ReaderStream;
 
+// FIXME add documentation
+// FIXME add logging
+
 fn make_fullpath(root: &str, subpath: Option<&str>) -> Result<PathBuf>
 {
     let mut fullpath = Path::new(root).to_path_buf();
@@ -36,7 +39,7 @@ async fn is_dir(path: &PathBuf) -> Result<bool>
     Ok(metadata.is_dir())
 }
 
-async fn get_folder_entries(fullpath: &PathBuf) -> std::result::Result<Vec<String>, anyhow::Error> {
+async fn get_folder_entries(fullpath: &PathBuf) -> Result<Vec<String>> {
     let entries = fs::read_dir(fullpath).await?;
     let mut entries = ReadDirStream::new(entries);
 
@@ -53,7 +56,7 @@ async fn get_folder_entries(fullpath: &PathBuf) -> std::result::Result<Vec<Strin
     Ok(result)
 }
 
-async fn get_file_stream(fullpath: &PathBuf) -> std::result::Result<impl IntoResponse, anyhow::Error> {
+async fn get_file_stream(fullpath: &PathBuf) -> Result<impl IntoResponse> {
     // Based on https://github.com/tokio-rs/axum/discussions/608
 
     // `File` implements `AsyncRead`
