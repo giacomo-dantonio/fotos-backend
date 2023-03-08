@@ -8,6 +8,7 @@ use axum::{
     Json,
     response::{IntoResponse, Response}
 };
+use mime::Mime;
 use tokio_stream::StreamExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -30,6 +31,23 @@ fn make_fullpath(root: &str, subpath: Option<&str>) -> Result<PathBuf>
     }
     else {
         Err(anyhow!("path {} doesn't exist", fullpath.to_str().unwrap_or("")))
+    }
+}
+
+// FIXME: add more types
+fn get_mimetype (filepath : &PathBuf) -> Mime {
+    let ext = filepath.extension()
+        .and_then(|s| s.to_str());
+
+    match ext {
+        Some(ext) =>
+            match ext {
+                "png" => mime::IMAGE_PNG,
+                "jpg" => mime::IMAGE_JPEG,
+                "json" => mime::APPLICATION_JSON,
+                &_ => mime::APPLICATION_OCTET_STREAM,
+            },
+        None => mime::APPLICATION_OCTET_STREAM,
     }
 }
 
@@ -65,13 +83,16 @@ async fn get_file_stream(fullpath: &PathBuf) -> Result<impl IntoResponse> {
     let filename = fullpath.file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("");
-    let header_filename = format!("attachment; filename=\"{filename}\"");
+    let mimetype = get_mimetype(fullpath);
 
     let headers = [
-        (header::CONTENT_TYPE, "application/octet-stream".to_string()),
+        (
+            header::CONTENT_TYPE,
+            mimetype.to_string()
+        ),
         (
             header::CONTENT_DISPOSITION,
-            header_filename,
+            format!("attachment; filename=\"{filename}\""),
         ),
     ];
 

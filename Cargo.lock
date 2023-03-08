@@ -161,6 +161,7 @@ dependencies = [
  "bytes",
  "confy",
  "http-body",
+ "mime",
  "ring",
  "serde",
  "tokio",
