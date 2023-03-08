@@ -15,8 +15,8 @@ use tokio::fs;
 use tokio_stream::wrappers::ReadDirStream;
 use tokio_util::io::ReaderStream;
 
-// FIXME add documentation
-// FIXME add logging
+// FIXME: add documentation
+// FIXME: add logging
 
 fn make_fullpath(root: &str, subpath: Option<&str>) -> Result<PathBuf>
 {
@@ -62,11 +62,16 @@ async fn get_file_stream(fullpath: &PathBuf) -> Result<impl IntoResponse> {
     // `File` implements `AsyncRead`
     let file = tokio::fs::File::open(fullpath).await?;
 
+    let filename = fullpath.file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    let header_filename = format!("attachment; filename=\"{filename}\"");
+
     let headers = [
-        (header::CONTENT_TYPE, "application/octet-stream"),
+        (header::CONTENT_TYPE, "application/octet-stream".to_string()),
         (
             header::CONTENT_DISPOSITION,
-            "attachment; filename=\"penguins.jpg\"",
+            header_filename,
         ),
     ];
 
@@ -208,6 +213,14 @@ mod tests {
     #[tokio::test]
     async fn file_download_name_test() {
         // if the path is a file the browser will download the file with the correct name
-        unimplemented!()
+        for filename in ["penguins.jpg", "apollon.jpg"] {
+            let state = make_state();
+
+            let subpath = extract::Path(filename.to_string());
+            let response = super::folder_list(state, Some(subpath)).await.unwrap();
+            let content_type = response.headers().get("Content-Disposition").cloned().unwrap();
+
+            assert_eq!(content_type.to_str().unwrap(), format!("attachment; filename=\"{filename}\""));
+        }
     }
 }
