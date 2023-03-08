@@ -104,7 +104,7 @@ async fn get_file_stream(fullpath: &PathBuf) -> Result<impl IntoResponse> {
     Ok((headers, body))
 }
 
-pub async fn folder_list(
+pub async fn download(
     State(cfg): State<Arc<AppState>>,
     subpath: Option<extract::Path<String>>) -> Result<Response, StatusCode> {
 

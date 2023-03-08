@@ -22,8 +22,8 @@ async fn main() -> anyhow::Result<()> {
     let shared_state = Arc::new(app_conf);
 
     let app = Router::new()
-        .route("/*subpath", get(handlers::folder_list))
-        .route("/", get(handlers::folder_list))
+        .route("/*subpath", get(handlers::download))
+        .route("/", get(handlers::download))
         .with_state(shared_state);
 
     // FIXME: make host and port configurable

@@ -43,7 +43,7 @@ async fn folder_return_type_test() {
     let state = make_state();
     let subpath = extract::Path("folder".to_string());
 
-    let response = super::folder_list(state, Some(subpath)).await.unwrap();
+    let response = super::download(state, Some(subpath)).await.unwrap();
     let content_type = response.headers().get("Content-Type").unwrap();
 
     assert_eq!(content_type.to_str().unwrap(), "application/json");
@@ -51,11 +51,11 @@ async fn folder_return_type_test() {
 
 #[tokio::test]
 async fn file_return_type_test() {
-    // if the path is a file the endpoint will return the content of the file
+    // if the path is a file the response headers will contain the content type of the file
     let state = make_state();
     let subpath = extract::Path("penguins.jpg".to_string());
 
-    let response = super::folder_list(state, Some(subpath)).await.unwrap();
+    let response = super::download(state, Some(subpath)).await.unwrap();
     let content_type = response.headers().get("Content-Type").cloned().unwrap();
     assert_eq!(content_type.to_str().unwrap(), "image/jpeg");
 }
@@ -77,7 +77,7 @@ async fn file_return_checksum_test() {
     let state = make_state();
     let subpath = extract::Path("penguins.jpg".to_string());
 
-    let mut response = super::folder_list(state, Some(subpath)).await.unwrap();
+    let mut response = super::download(state, Some(subpath)).await.unwrap();
 
     let body = response.body_mut();
     let actual_hash = sha256_digest(body).await.unwrap();
@@ -94,7 +94,7 @@ async fn not_exists_return_type_test() {
     let state = make_state();
     let subpath = extract::Path("not_exists".to_string());
 
-    let result = super::folder_list(state, Some(subpath)).await;
+    let result = super::download(state, Some(subpath)).await;
     assert!(result.is_err());
 
     let status = result.unwrap_err();
@@ -108,7 +108,7 @@ async fn file_download_name_test() {
         let state = make_state();
 
         let subpath = extract::Path(filename.to_string());
-        let response = super::folder_list(state, Some(subpath)).await.unwrap();
+        let response = super::download(state, Some(subpath)).await.unwrap();
         let content_type = response.headers().get("Content-Disposition").cloned().unwrap();
 
         assert_eq!(content_type.to_str().unwrap(), format!("attachment; filename=\"{filename}\""));
