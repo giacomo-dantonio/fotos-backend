@@ -16,8 +16,8 @@ use tokio::fs;
 use tokio_stream::wrappers::ReadDirStream;
 use tokio_util::io::ReaderStream;
 
-// FIXME: add documentation
-// FIXME: add logging
+// TODO: add documentation
+// TODO: add logging
 
 fn make_fullpath(root: &str, subpath: Option<&str>) -> Result<PathBuf>
 {
@@ -34,7 +34,7 @@ fn make_fullpath(root: &str, subpath: Option<&str>) -> Result<PathBuf>
     }
 }
 
-// FIXME: add more types
+// TODO: add more types
 fn get_mimetype (filepath : &PathBuf) -> Mime {
     let ext = filepath.extension()
         .and_then(|s| s.to_str());
