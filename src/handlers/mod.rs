@@ -1,6 +1,8 @@
-use crate::AppState;
+use crate::{
+    api::error::{ApiError, ApiResult},
+    AppState
+};
 
-use anyhow::{anyhow, Result};
 use axum::{
     body::StreamBody,
     extract::{self, State},
@@ -17,9 +19,8 @@ use tokio_stream::wrappers::ReadDirStream;
 use tokio_util::io::ReaderStream;
 
 // TODO: add documentation
-// TODO: add logging
 
-fn make_fullpath(root: &str, subpath: Option<&str>) -> Result<PathBuf>
+fn make_fullpath(root: &str, subpath: Option<&str>) -> ApiResult<PathBuf>
 {
     let mut fullpath = Path::new(root).to_path_buf();
     if let Some(subpath) = subpath {
@@ -30,7 +31,8 @@ fn make_fullpath(root: &str, subpath: Option<&str>) -> Result<PathBuf>
         Ok(fullpath)
     }
     else {
-        Err(anyhow!("path {} doesn't exist", fullpath.to_str().unwrap_or("")))
+        let msg = format!("path {} doesn't exist", fullpath.to_str().unwrap_or(""));
+        Err(ApiError::new(StatusCode::NOT_FOUND).with_msg(msg))
     }
 }
 
@@ -51,13 +53,13 @@ fn get_mimetype (filepath : &PathBuf) -> Mime {
     }
 }
 
-async fn is_dir(path: &PathBuf) -> Result<bool>
+async fn is_dir(path: &PathBuf) -> ApiResult<bool>
 {
     let metadata = fs::metadata(path).await?;
     Ok(metadata.is_dir())
 }
 
-async fn get_folder_entries(fullpath: &PathBuf) -> Result<Vec<String>> {
+async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<String>> {
     let entries = fs::read_dir(fullpath).await?;
     let mut entries = ReadDirStream::new(entries);
 
@@ -65,7 +67,10 @@ async fn get_folder_entries(fullpath: &PathBuf) -> Result<Vec<String>> {
     while let Some(entry) = entries.next().await {
         if let Ok(entry) = entry {
             let filename = entry.file_name().to_str()
-                .ok_or(anyhow!("Encoding issue"))?
+                .ok_or(
+                    ApiError::new(StatusCode::INTERNAL_SERVER_ERROR)
+                    .with_msg("Encoding issue".to_string())
+                )?
                 .to_string();
             result.push(filename);
         }
@@ -74,7 +79,7 @@ async fn get_folder_entries(fullpath: &PathBuf) -> Result<Vec<String>> {
     Ok(result)
 }
 
-async fn get_file_stream(fullpath: &PathBuf) -> Result<impl IntoResponse> {
+async fn get_file_stream(fullpath: &PathBuf) -> ApiResult<impl IntoResponse> {
     // Based on https://github.com/tokio-rs/axum/discussions/608
 
     // `File` implements `AsyncRead`
@@ -106,15 +111,13 @@ async fn get_file_stream(fullpath: &PathBuf) -> Result<impl IntoResponse> {
 
 pub async fn download(
     State(cfg): State<Arc<AppState>>,
-    subpath: Option<extract::Path<String>>) -> Result<Response, StatusCode> {
-
+    subpath: Option<extract::Path<String>>
+) -> ApiResult<Response> {
     let subpath = subpath.as_ref().map(|p| p.as_str());
-    let fullpath = make_fullpath(&cfg.root, subpath)
-        .map_err(|_| StatusCode::NOT_FOUND)?;
+    let fullpath = make_fullpath(&cfg.root, subpath)?;
 
-    let is_dir = is_dir(&fullpath).await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let result: Result<Response>;
+    let is_dir = is_dir(&fullpath).await?;
+    let result: ApiResult<Response>;
     if is_dir {
         result = get_folder_entries(&fullpath).await
             .map(|children| Json(children).into_response());
@@ -124,7 +127,7 @@ pub async fn download(
             .map(|stream| stream.into_response());
     }
 
-    result.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+    result
 }
 
 #[cfg(test)]

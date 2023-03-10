@@ -3,17 +3,17 @@
 
 use axum::{
     http::StatusCode,
-    IntoResponse,
-    Response
+    response::{Response, IntoResponse}
 };
 use tracing::error;
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
+#[derive(Debug)]
 pub struct ApiError {
-    status: StatusCode,
-    message: Option<&'static str>,
-    cause: Option<anyhow::Error>,
+    pub status: StatusCode,
+    pub message: Option<String>,
+    pub cause: Option<anyhow::Error>,
 }
 
 impl ApiError {
@@ -25,7 +25,7 @@ impl ApiError {
         }
     }
 
-    pub fn with_msg(mut self, msg: &'static str) -> Self {
+    pub fn with_msg(mut self, msg: String) -> Self {
         self.message = Some(msg);
         self
     }
@@ -51,7 +51,7 @@ impl IntoResponse for ApiError {
 
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    msg.unwrap_or("Something went wrong..."),
+                    msg.unwrap_or("Something went wrong...".to_string()),
                 ).into_response()
             }
             (status, Some(msg)) => (status, msg).into_response(),
@@ -59,11 +59,18 @@ impl IntoResponse for ApiError {
         }
     }
 }
-// This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into// `Result<_, AppError>`. That way you don't need to do that manually.impl<E> From<E> for ApiErrorwhere    E: Into<anyhow::Error>,
+
+// This enables using `?` on functions that return `Result<_, anyhow::Error>`
+// to turn them into `Result<_, AppError>`.
+// That way you don't need to do that manually.
+impl<E> From<E> for ApiError
+where
+    E: Into<anyhow::Error>
 {
-    fn from(err: E) -> Self {
+    fn from(err: E) -> Self
+    {
         Self::new(StatusCode::INTERNAL_SERVER_ERROR)
-            .with_msg("Something went wrong...")
+            .with_msg("Something went wrong...".to_string())
             .with_cause(err)
     }
 }

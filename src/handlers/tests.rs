@@ -98,7 +98,7 @@ async fn not_exists_return_type_test() {
     assert!(result.is_err());
 
     let status = result.unwrap_err();
-    assert_eq!(status, StatusCode::from_u16(404).unwrap());
+    assert_eq!(status.status, StatusCode::from_u16(404).unwrap());
 }
 
 #[tokio::test]
