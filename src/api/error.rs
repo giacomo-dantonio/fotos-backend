@@ -1,4 +1,4 @@
-// Credits to angelo.steinbach@stone-dev.de, who is to lazy to publish
+// Credits to angelo.steinbach@stone-dev.de, who is too lazy to publish
 // a crate for this.
 
 use axum::{
