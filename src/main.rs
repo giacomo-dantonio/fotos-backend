@@ -25,6 +25,8 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Load config {}", cfg_path.to_str().unwrap_or(""));
 
     let app_conf : AppState = confy::load(APPNAME, None)?;
+    let addr = app_conf.connection.parse()?;
+
     let shared_state = Arc::new(app_conf);
 
     let app = Router::new()
@@ -37,9 +39,6 @@ async fn main() -> anyhow::Result<()> {
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO))
         );
 
-    // run it with hyper on localhost:3000
-    // TODO: make host and port configurable
-    let addr = "0.0.0.0:3000".parse()?;
     tracing::info!("listening on {}", addr);
 
     axum::Server::bind(&addr)
