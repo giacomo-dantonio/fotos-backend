@@ -13,7 +13,6 @@ static APPNAME : &str = "foto_backend";
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // TODO: add cli parameters for verbose
-    // TODO: add linter to the project
 
     tracing_subscriber::fmt()
         .with_target(false)

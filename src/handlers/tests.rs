@@ -34,7 +34,10 @@ fn make_state() -> State<Arc<AppState>> {
         .join("data");
     let root = root.to_str().unwrap();
 
-    State(Arc::new(AppState { root: root.to_string() }))
+    State(Arc::new(AppState {
+        root: root.to_string(),
+        connection: "0.0.0.0:3000".to_string()
+    }))
 }
 
 #[tokio::test]
