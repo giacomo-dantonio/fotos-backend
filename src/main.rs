@@ -1,4 +1,3 @@
-use anyhow;
 use axum::{
     routing::get,
     Router

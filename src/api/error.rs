@@ -51,7 +51,7 @@ impl IntoResponse for ApiError {
 
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    msg.unwrap_or("Something went wrong...".to_string()),
+                    msg.unwrap_or_else(|| "Something went wrong...".to_string()),
                 ).into_response()
             }
             (status, Some(msg)) => (status, msg).into_response(),

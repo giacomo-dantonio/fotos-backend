@@ -11,6 +11,7 @@ use axum::{
     response::{IntoResponse, Response}
 };
 use mime::Mime;
+use mime_guess;
 use tokio_stream::StreamExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -36,21 +37,10 @@ fn make_fullpath(root: &str, subpath: Option<&str>) -> ApiResult<PathBuf>
     }
 }
 
-// TODO: add more types
 fn get_mimetype (filepath : &PathBuf) -> Mime {
-    let ext = filepath.extension()
-        .and_then(|s| s.to_str());
-
-    match ext {
-        Some(ext) =>
-            match ext {
-                "png" => mime::IMAGE_PNG,
-                "jpg" => mime::IMAGE_JPEG,
-                "json" => mime::APPLICATION_JSON,
-                &_ => mime::APPLICATION_OCTET_STREAM,
-            },
-        None => mime::APPLICATION_OCTET_STREAM,
-    }
+    mime_guess::from_path(filepath)
+        .first()
+        .unwrap_or(mime::APPLICATION_OCTET_STREAM)
 }
 
 async fn is_dir(path: &PathBuf) -> ApiResult<bool>
@@ -67,7 +57,7 @@ async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<String>> {
     while let Some(entry) = entries.next().await {
         if let Ok(entry) = entry {
             let filename = entry.file_name().to_str()
-                .ok_or(
+                .ok_or_else(||
                     ApiError::new(StatusCode::INTERNAL_SERVER_ERROR)
                     .with_msg("Encoding issue".to_string())
                 )?
@@ -115,17 +105,16 @@ pub async fn download(
 ) -> ApiResult<Response> {
     let subpath = subpath.as_ref().map(|p| p.as_str());
     let fullpath = make_fullpath(&cfg.root, subpath)?;
-
     let is_dir = is_dir(&fullpath).await?;
-    let result: ApiResult<Response>;
-    if is_dir {
-        result = get_folder_entries(&fullpath).await
-            .map(|children| Json(children).into_response());
+
+    let result: ApiResult<Response> = if is_dir {
+        get_folder_entries(&fullpath).await
+            .map(|children| Json(children).into_response())
     }
     else {
-        result = get_file_stream(&fullpath).await
-            .map(|stream| stream.into_response());
-    }
+        get_file_stream(&fullpath).await
+            .map(|stream| stream.into_response())
+    };
 
     result
 }
