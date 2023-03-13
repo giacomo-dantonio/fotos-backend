@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Set up tracing and logging
     let max_level: Level = Level::from_str(app_conf.max_level.as_str())
-        .unwrap_or_else(|_| Level::INFO);
+        .unwrap_or(Level::INFO);
     tracing_subscriber::fmt()
         .with_target(false)
         .with_max_level(max_level)
