@@ -2,7 +2,7 @@ use axum::{
     routing::get,
     Router
 };
-use std::sync::Arc;
+use std::{sync::Arc, str::FromStr};
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
 
@@ -12,18 +12,20 @@ static APPNAME : &str = "foto_backend";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // TODO: add cli parameters for verbose
+    let cfg_path = confy::get_configuration_file_path(APPNAME, None)
+        .unwrap();
+    let app_conf : AppState = confy::load(APPNAME, None)?;
 
+    let max_level: Level = Level::from_str(app_conf.max_level.as_str())
+        .unwrap_or_else(|_| Level::INFO);
     tracing_subscriber::fmt()
         .with_target(false)
+        .with_max_level(max_level)
         .compact()
         .init();
 
-    let cfg_path = confy::get_configuration_file_path(APPNAME, None)
-        .unwrap();
-    tracing::info!("Load config {}", cfg_path.to_str().unwrap_or(""));
+    tracing::debug!("Loaded config {}", cfg_path.to_str().unwrap_or(""));
 
-    let app_conf : AppState = confy::load(APPNAME, None)?;
     let addr = app_conf.connection.parse()?;
 
     let shared_state = Arc::new(app_conf);
