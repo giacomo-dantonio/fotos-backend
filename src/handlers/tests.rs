@@ -36,7 +36,8 @@ fn make_state() -> State<Arc<AppState>> {
 
     State(Arc::new(AppState {
         root: root.to_string(),
-        connection: "0.0.0.0:3000".to_string()
+        connection: "0.0.0.0:3000".to_string(),
+        max_level: "DEBUG".to_string()
     }))
 }
 
