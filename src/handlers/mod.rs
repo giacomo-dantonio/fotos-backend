@@ -21,6 +21,8 @@ use tokio_util::io::ReaderStream;
 
 // TODO: add documentation
 
+/// Makes a fullpath valid on the local file system from the path of
+/// the http route.
 fn make_fullpath(root: &str, subpath: Option<&str>) -> ApiResult<PathBuf>
 {
     let mut fullpath = Path::new(root).to_path_buf();
@@ -37,18 +39,22 @@ fn make_fullpath(root: &str, subpath: Option<&str>) -> ApiResult<PathBuf>
     }
 }
 
+/// Gets the mimetype of a file on the local file system.
 fn get_mimetype (filepath : &PathBuf) -> Mime {
     mime_guess::from_path(filepath)
         .first()
         .unwrap_or(mime::APPLICATION_OCTET_STREAM)
 }
 
+/// Checks whether `path` is a directory.
 async fn is_dir(path: &PathBuf) -> ApiResult<bool>
 {
     let metadata = fs::metadata(path).await?;
     Ok(metadata.is_dir())
 }
 
+/// Returns the filename of all the entry in the folder specified by
+/// `fullpath`
 async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<String>> {
     let entries = fs::read_dir(fullpath).await?;
     let mut entries = ReadDirStream::new(entries);
@@ -69,6 +75,8 @@ async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<String>> {
     Ok(result)
 }
 
+/// Returns the content of the file specified by `fullpath` as a binary
+/// stream.
 async fn get_file_stream(fullpath: &PathBuf) -> ApiResult<impl IntoResponse> {
     // Based on https://github.com/tokio-rs/axum/discussions/608
 
@@ -99,6 +107,24 @@ async fn get_file_stream(fullpath: &PathBuf) -> ApiResult<impl IntoResponse> {
     Ok((headers, body))
 }
 
+/// Handles the route for the path specified by `subpath` by returning the
+/// content of the ressource.
+/// 
+/// For example if the root folder is `/opt/content`
+/// and the client does an http request like
+/// 
+///     GET /my/little/pony
+///
+/// The endpoint will return the content of the file
+/// `/opt/content/my/little/pony`.
+/// If it is a folder, it will return a json response containing the list
+/// of the folder's entry names.
+/// If it is a file, it will return the content of the file as a binary stream.
+/// 
+/// # Arguments
+/// 
+/// - `State(cfg)` - The app configuration as a shared state.
+/// - `subpath` - The path to the resource as specified in the http route.
 pub async fn download(
     State(cfg): State<Arc<AppState>>,
     subpath: Option<extract::Path<String>>
