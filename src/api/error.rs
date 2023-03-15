@@ -9,14 +9,25 @@ use tracing::error;
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
+/// A custom error implementation that keeps track of the HTTP error code
+/// to be returned by the endpoint.
+///
+/// This helps keeping the endpoint clean. Even though it scatters
+/// the handling of the HTTP request through the code base.
 #[derive(Debug)]
 pub struct ApiError {
+    /// The HTTP error code for the error.
     pub status: StatusCode,
+
+    /// A human readable message to be used as payload for the HTTP response.
     pub message: Option<String>,
+
+    /// The original error.
     pub cause: Option<anyhow::Error>,
 }
 
 impl ApiError {
+    /// Creates a new `ApiError` for a given code.
     pub fn new(status: StatusCode) -> Self {
         Self {
             status,
@@ -25,11 +36,13 @@ impl ApiError {
         }
     }
 
+    /// Adds a message to the `ApiError`.
     pub fn with_msg(mut self, msg: String) -> Self {
         self.message = Some(msg);
         self
     }
 
+    /// Adds a cause to the `ApiError`.
     pub fn with_cause<E>(mut self, cause: E) -> Self
         where
             E: Into<anyhow::Error>,

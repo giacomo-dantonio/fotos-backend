@@ -19,8 +19,6 @@ use tokio::fs;
 use tokio_stream::wrappers::ReadDirStream;
 use tokio_util::io::ReaderStream;
 
-// TODO: add documentation
-
 /// Makes a fullpath valid on the local file system from the path of
 /// the http route.
 fn make_fullpath(root: &str, subpath: Option<&str>) -> ApiResult<PathBuf>
