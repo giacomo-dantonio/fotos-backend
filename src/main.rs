@@ -32,8 +32,8 @@ async fn main() -> anyhow::Result<()> {
     let addr = app_conf.connection.parse()?;
     let shared_state = Arc::new(app_conf);
     let app = Router::new()
-        .route("/*subpath", get(handlers::download))
-        .route("/", get(handlers::download))
+        .route("/data/*subpath", get(handlers::download))
+        .route("/data", get(handlers::download))
         .with_state(shared_state)
         .layer(
             TraceLayer::new_for_http()
