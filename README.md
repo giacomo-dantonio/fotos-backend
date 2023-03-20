@@ -16,8 +16,8 @@ tag persons, etc.) one can reduce the quality of the pictures
 (size and resolution) to make them more lightweight.
 The backend will to this on the fly.
 
-Together with this repository, a web frontend will be build in a separate
-repository, that allows to browse through the pictures comfortably.
+Together with this repository a web frontend will be build in a separate
+repository, that will allow to browse through the pictures comfortably.
 
 ## Tag
 
@@ -35,12 +35,24 @@ photos of my vacation in Abruzzo, then all the pictures in the folder
 will get the tag Abruzzo). The backend need to able to tag all pictures
 in a folder with one API call.
 
-### Face recognition
+### Face or person recognition
 
 The goal is to be able to search for given persons (e.g. all pictures of me).
-I will use a pre-trained model for face recognition, then do some clustering
-and manually tag the clusters.
+I will use a pre-trained model for face or person recognition,
+then do some clustering and manually tag the clusters.
+
+## Search
+
+Once pictures and persons on them are tagged the next step will be to make
+the picture searchable.
 
 ## Learn
 
+When new pictures come in, they should be automatically tagged.
+For this I will train two models (for classification and recognition).
+Additionally it should be possible to correct the prediction manually.
+For example I may want to introduce new tags.
+
 ## Improve
+
+The models should be retrainted regurarly as new pictures come in.
