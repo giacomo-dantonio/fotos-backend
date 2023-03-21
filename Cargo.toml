@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-axum = "0.6"
+axum = { version = "0.6", feratures = [ "query" ] }
 bytes = "1"
 confy = "0.5"
 mime = "0.3"

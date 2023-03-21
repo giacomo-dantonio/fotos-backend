@@ -5,13 +5,14 @@ use crate::{
 
 use axum::{
     body::StreamBody,
-    extract::{self, State},
+    extract::{self, Query, State},
     http::{StatusCode, header},
     Json,
     response::{IntoResponse, Response}
 };
 use mime::Mime;
 use mime_guess;
+use serde::Deserialize;
 use tokio_stream::StreamExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -39,7 +40,8 @@ use tokio_util::io::ReaderStream;
 /// - `subpath` - The path to the resource as specified in the http route.
 pub async fn download(
     State(cfg): State<Arc<AppState>>,
-    subpath: Option<extract::Path<String>>
+    subpath: Option<extract::Path<String>>,
+    params: Query<Params>
 ) -> ApiResult<Response> {
     let subpath = subpath.as_ref().map(|p| p.as_str());
     let fullpath = make_fullpath(&cfg.root, subpath)?;
@@ -55,6 +57,15 @@ pub async fn download(
     };
 
     result
+}
+
+// https://docs.rs/image/latest/image/index.html
+
+#[derive(Default, Deserialize)]
+pub struct Params {
+    max_dpi: Option<u32>,
+    max_width: Option<u32>,
+    max_height: Option<u32>,
 }
 
 /// Makes a fullpath valid on the local file system from the path of
