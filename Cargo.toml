@@ -10,6 +10,7 @@ anyhow = "1.0"
 axum = { version = "0.6", feratures = [ "query" ] }
 bytes = "1"
 confy = "0.5"
+image = "0"
 mime = "0.3"
 mime_guess = "2"
 serde = { version = "1", features = ["derive"] }

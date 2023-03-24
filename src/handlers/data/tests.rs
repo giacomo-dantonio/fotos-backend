@@ -6,17 +6,20 @@ use axum::{
     http::StatusCode,
     body::{HttpBody}
 };
-use bytes::Bytes;
+use bytes::{Bytes, Buf};
 use http_body::combinators::UnsyncBoxBody;
+use image::{io::Reader as ImageReader, DynamicImage, codecs::jpeg::JpegDecoder};
 use ring::digest::{Context, Digest, SHA256};
 use ring::test;
-use std::{env, sync::Arc, vec};
+use std::{env, io, sync::Arc, vec};
+
+// FIXME: replace unwrap with expect
 
 #[tokio::test]
 async fn get_folder_entries_test() {
     // the get_folder_entries function returns the filenames in the given folder
     let root = env::current_dir()
-        .unwrap()
+        .expect("Cannot read current dir")
         .join("data");
 
     let fullpath = super::make_fullpath(root.to_str().unwrap(), None).unwrap();
@@ -129,21 +132,22 @@ async fn file_download_name_test() {
     }
 }
 
-#[tokio::test]
-async fn lower_max_dpi_test() {
-    // if the path is an image and the max_dpi query parameter is set
-    // to a value lower than the image's resolution,
-    // the endpoint will lower the resolution of the image.
+async fn read_image(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> DynamicImage {
+    let data = body.data().await.unwrap().unwrap();
+    let buf = io::Cursor::new(data);
 
-    unimplemented!()
+    let reader = ImageReader::new(buf);
+    reader.decode().unwrap()
 }
 
-#[tokio::test]
-async fn higher_max_dpi_test() {
-    // if the path is an image and the max_dpi query parameter is higher than
-    // the image's resolution, the endpoint won't lower the resolution of the image.
+async fn read_jpeg(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> DynamicImage {
+    let data = body.data().await.unwrap().unwrap();
 
-    unimplemented!()
+    let buf = io::Cursor::new(data);
+    let decoder = JpegDecoder::new(buf).unwrap();
+
+    let reader = ImageReader::new(buf);
+    reader.decode().unwrap()
 }
 
 #[tokio::test]
@@ -151,6 +155,19 @@ async fn lower_max_width_test() {
     // if the path is an image and the max_width query parameter is set
     // to a value lower than the image's width,
     // the endpoint will resize the image and mantain the ratio.
+
+    let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
+    let state = make_state();
+    let params = Params { 
+        max_width: None,
+        max_height: None
+    };
+
+    let subpath = extract::Path(filename.to_string());
+    let mut response = super::download(state, Some(subpath), Query(params)).await.unwrap();
+    let body = response.body_mut();
+
+    let image = read_image(body).await;
 
     unimplemented!()
 }

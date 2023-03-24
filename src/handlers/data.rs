@@ -38,6 +38,7 @@ use tokio_util::io::ReaderStream;
 /// 
 /// - `State(cfg)` - The app configuration as a shared state.
 /// - `subpath` - The path to the resource as specified in the http route.
+/// - `params` - Specify resizing options for images.
 pub async fn download(
     State(cfg): State<Arc<AppState>>,
     subpath: Option<extract::Path<String>>,
@@ -63,7 +64,6 @@ pub async fn download(
 
 #[derive(Default, Deserialize)]
 pub struct Params {
-    max_dpi: Option<u32>,
     max_width: Option<u32>,
     max_height: Option<u32>,
 }
