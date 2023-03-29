@@ -16,9 +16,10 @@ use serde::Deserialize;
 use tokio_stream::StreamExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::fs;
+use tokio::{fs, io::AsyncRead};
 use tokio_stream::wrappers::ReadDirStream;
 use tokio_util::io::ReaderStream;
+
 
 /// Handles the route for the path specified by `subpath` by returning the
 /// content of the ressource.
@@ -53,7 +54,7 @@ pub async fn download(
             .map(|children| Json(children).into_response())
     }
     else {
-        get_file_stream(&fullpath).await
+        get_file_stream(&fullpath, &params).await
             .map(|stream| stream.into_response())
     };
 
@@ -122,13 +123,28 @@ async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<String>> {
     Ok(result)
 }
 
+fn into_response<T>(read: T) -> Response
+    where T: AsyncRead + Send + 'static
+{
+    // convert the `AsyncRead` into a `Stream`
+    let stream = ReaderStream::new(read);
+    // convert the `Stream` into an `axum::body::HttpBody`
+    StreamBody::new(stream).into_response()
+}
+
 /// Returns the content of the file specified by `fullpath` as a binary
 /// stream.
-async fn get_file_stream(fullpath: &PathBuf) -> ApiResult<impl IntoResponse> {
+async fn get_file_stream(fullpath: &PathBuf, params: &Params) -> ApiResult<impl IntoResponse> {
     // Based on https://github.com/tokio-rs/axum/discussions/608
 
-    // `File` implements `AsyncRead`
-    let file = tokio::fs::File::open(fullpath).await?;
+    let resize = imgs::is_image(fullpath) && (params.max_width.is_some() || params.max_height.is_some());
+    let body: Response = if resize {
+        let bytes = imgs::resize(fullpath, params.max_height, params.max_height);
+        into_response(bytes)
+    } else {
+        let file = tokio::fs::File::open(fullpath).await?;
+        into_response(file)
+    };
 
     let filename = fullpath.file_name()
         .and_then(|s| s.to_str())
@@ -146,13 +162,10 @@ async fn get_file_stream(fullpath: &PathBuf) -> ApiResult<impl IntoResponse> {
         ),
     ];
 
-    // convert the `AsyncRead` into a `Stream`
-    let stream = ReaderStream::new(file);
-    // convert the `Stream` into an `axum::body::HttpBody`
-    let body = StreamBody::new(stream);
-
     Ok((headers, body))
 }
+
+pub mod imgs;
 
 #[cfg(test)]
 mod tests;

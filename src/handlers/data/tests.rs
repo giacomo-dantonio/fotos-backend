@@ -6,9 +6,9 @@ use axum::{
     http::StatusCode,
     body::{HttpBody}
 };
-use bytes::{Bytes, Buf};
+use bytes::Bytes;
 use http_body::combinators::UnsyncBoxBody;
-use image::{io::Reader as ImageReader, DynamicImage, codecs::jpeg::JpegDecoder};
+use image::{io::Reader as ImageReader, DynamicImage};
 use ring::digest::{Context, Digest, SHA256};
 use ring::test;
 use std::{env, io, sync::Arc, vec};
@@ -133,22 +133,20 @@ async fn file_download_name_test() {
 }
 
 async fn read_image(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> DynamicImage {
-    let data = body.data().await.unwrap().unwrap();
-    let buf = io::Cursor::new(data);
+    let mut buf = vec![];
 
-    let reader = ImageReader::new(buf);
+    while let Some(bytes) = body.data().await {
+        let bytes = bytes.unwrap();
+        buf.extend_from_slice(bytes.as_ref());
+    }
+
+    let buf = io::Cursor::new(buf);
+    let reader = ImageReader::new(buf)
+        .with_guessed_format().unwrap();
     reader.decode().unwrap()
 }
 
-async fn read_jpeg(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> DynamicImage {
-    let data = body.data().await.unwrap().unwrap();
-
-    let buf = io::Cursor::new(data);
-    let decoder = JpegDecoder::new(buf).unwrap();
-
-    let reader = ImageReader::new(buf);
-    reader.decode().unwrap()
-}
+// penguins.jps 474 x 296 96 dpi
 
 #[tokio::test]
 async fn lower_max_width_test() {
@@ -159,7 +157,7 @@ async fn lower_max_width_test() {
     let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
     let state = make_state();
     let params = Params { 
-        max_width: None,
+        max_width: Some(200),
         max_height: None
     };
 
@@ -168,8 +166,7 @@ async fn lower_max_width_test() {
     let body = response.body_mut();
 
     let image = read_image(body).await;
-
-    unimplemented!()
+    assert!(image.width() == 200);
 }
 
 #[tokio::test]
@@ -177,7 +174,19 @@ async fn higher_max_width_test() {
     // if the path is an image and the max_width query parameter is higher than
     // the image's width, the endpoint won't resize the image.
 
-    unimplemented!()
+    let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
+    let state = make_state();
+    let params = Params { 
+        max_width: Some(500),
+        max_height: None
+    };
+
+    let subpath = extract::Path(filename.to_string());
+    let mut response = super::download(state, Some(subpath), Query(params)).await.unwrap();
+    let body = response.body_mut();
+
+    let image = read_image(body).await;
+    assert!(image.width() == 474);
 }
 
 #[tokio::test]
@@ -186,7 +195,19 @@ async fn lower_max_height_test() {
     // to a value lower than the image's height,
     // the endpoint will resize the image and mantain the ratio.
 
-    unimplemented!()
+    let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
+    let state = make_state();
+    let params = Params { 
+        max_width: None,
+        max_height: Some(100)
+    };
+
+    let subpath = extract::Path(filename.to_string());
+    let mut response = super::download(state, Some(subpath), Query(params)).await.unwrap();
+    let body = response.body_mut();
+
+    let image = read_image(body).await;
+    assert!(image.height() == 100);
 }
 
 #[tokio::test]
@@ -194,5 +215,21 @@ async fn higher_max_height_test() {
     // if the path is an image and the max_height query parameter is higher than
     // the image's height, the endpoint won't resize the image.
 
-    unimplemented!()
+    // if the path is an image and the max_height query parameter is set
+    // to a value lower than the image's height,
+    // the endpoint will resize the image and mantain the ratio.
+
+    let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
+    let state = make_state();
+    let params = Params { 
+        max_width: None,
+        max_height: Some(300)
+    };
+
+    let subpath = extract::Path(filename.to_string());
+    let mut response = super::download(state, Some(subpath), Query(params)).await.unwrap();
+    let body = response.body_mut();
+
+    let image = read_image(body).await;
+    assert!(image.height() == 296);
 }
