@@ -16,7 +16,7 @@ use serde::Deserialize;
 use tokio_stream::StreamExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::{fs, io::AsyncRead};
+use tokio::fs;
 use tokio_stream::wrappers::ReadDirStream;
 use tokio_util::io::ReaderStream;
 
@@ -123,15 +123,6 @@ async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<String>> {
     Ok(result)
 }
 
-fn into_response<T>(read: T) -> Response
-    where T: AsyncRead + Send + 'static
-{
-    // convert the `AsyncRead` into a `Stream`
-    let stream = ReaderStream::new(read);
-    // convert the `Stream` into an `axum::body::HttpBody`
-    StreamBody::new(stream).into_response()
-}
-
 /// Returns the content of the file specified by `fullpath` as a binary
 /// stream.
 async fn get_file_stream(fullpath: &PathBuf, params: &Params) -> ApiResult<impl IntoResponse> {
@@ -140,11 +131,16 @@ async fn get_file_stream(fullpath: &PathBuf, params: &Params) -> ApiResult<impl 
     let resize = imgs::is_image(fullpath)
         && imgs::needs_resize(fullpath, params.max_width, params.max_height)?;
     let body: Response = if resize {
-        let bytes = imgs::resize(fullpath, params.max_width, params.max_height)?;
-        into_response(bytes)
+        let bytes = imgs::resize(
+            fullpath,
+            params.max_width,
+            params.max_height
+        )?;
+        bytes.into_response()
     } else {
         let file = tokio::fs::File::open(fullpath).await?;
-        into_response(file)
+        let stream = ReaderStream::new(file);
+        StreamBody::new(stream).into_response()
     };
 
     let filename = fullpath.file_name()

@@ -1,7 +1,6 @@
 use anyhow;
-use std::{path::PathBuf, fs::FileType};
-use image::{io::Reader as ImageReader, imageops::FilterType};
-use tokio::io::AsyncRead;
+use std::{path::PathBuf, io::Cursor};
+use image::{io::Reader as ImageReader, imageops::FilterType, GenericImageView, ImageFormat};
 
 pub fn is_image(filepath: &PathBuf) -> bool {
     ImageReader::open(filepath)
@@ -25,19 +24,24 @@ pub fn needs_resize(filepath: &PathBuf, max_width: Option<u32>, max_height: Opti
     Ok(result)
 }
 
-static X: [u8; 1] = [0u8];
-
-pub fn resize(filepath: &PathBuf, max_width: Option<u32>, max_height: Option<u32>) -> anyhow::Result<impl AsyncRead> {
-    let img = ImageReader::open(filepath)?
+pub fn resize(filepath: &PathBuf, max_width: Option<u32>, max_height: Option<u32>) -> anyhow::Result<Vec<u8>> {
+    let reader = ImageReader::open(filepath)?
         .with_guessed_format()?;
-    let (width, height) = img.into_dimensions()?;
 
-    let img = img.decode()?;
+    let img = reader.decode()?;
+    let (width, height) = img.dimensions();
+
     let img = img.resize(
         max_width.unwrap_or(width),
         max_height.unwrap_or(height),
         FilterType::Nearest
     );
 
-    Ok(img.into_bytes())
+    let mut bytes: Vec<u8> = Vec::new();
+    img.write_to(
+        &mut Cursor::new(&mut bytes),
+        ImageFormat::from_path(filepath)?
+    )?;
+
+    Ok(bytes)
 }
