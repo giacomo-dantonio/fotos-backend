@@ -137,9 +137,10 @@ fn into_response<T>(read: T) -> Response
 async fn get_file_stream(fullpath: &PathBuf, params: &Params) -> ApiResult<impl IntoResponse> {
     // Based on https://github.com/tokio-rs/axum/discussions/608
 
-    let resize = imgs::is_image(fullpath) && (params.max_width.is_some() || params.max_height.is_some());
+    let resize = imgs::is_image(fullpath)
+        && imgs::needs_resize(fullpath, params.max_width, params.max_height)?;
     let body: Response = if resize {
-        let bytes = imgs::resize(fullpath, params.max_height, params.max_height);
+        let bytes = imgs::resize(fullpath, params.max_width, params.max_height)?;
         into_response(bytes)
     } else {
         let file = tokio::fs::File::open(fullpath).await?;
