@@ -1,17 +1,25 @@
 use crate::AppState;
+use super::Params;
 
-use axum::{extract::{State, self}, http::StatusCode, body::{HttpBody}};
+use axum::{
+    extract::{Query, State, self},
+    http::StatusCode,
+    body::{HttpBody}
+};
 use bytes::Bytes;
 use http_body::combinators::UnsyncBoxBody;
+use image::{io::Reader as ImageReader, DynamicImage};
 use ring::digest::{Context, Digest, SHA256};
 use ring::test;
-use std::{env, sync::Arc, vec};
+use std::{env, io, sync::Arc, vec};
+
+// FIXME: replace unwrap with expect
 
 #[tokio::test]
 async fn get_folder_entries_test() {
     // the get_folder_entries function returns the filenames in the given folder
     let root = env::current_dir()
-        .unwrap()
+        .expect("Cannot read current dir")
         .join("data");
 
     let fullpath = super::make_fullpath(root.to_str().unwrap(), None).unwrap();
@@ -45,9 +53,10 @@ fn make_state() -> State<Arc<AppState>> {
 async fn folder_return_type_test() {
     // if the path is a folder the endpoint will return a json
     let state = make_state();
+    let params = Params::default();
     let subpath = extract::Path("folder".to_string());
 
-    let response = super::download(state, Some(subpath)).await.unwrap();
+    let response = super::download(state, Some(subpath), Query(params)).await.unwrap();
     let content_type = response.headers().get("Content-Type").unwrap();
 
     assert_eq!(content_type.to_str().unwrap(), "application/json");
@@ -57,9 +66,10 @@ async fn folder_return_type_test() {
 async fn file_return_type_test() {
     // if the path is a file the response headers will contain the content type of the file
     let state = make_state();
+    let params = Params::default();
     let subpath = extract::Path("penguins.jpg".to_string());
 
-    let response = super::download(state, Some(subpath)).await.unwrap();
+    let response = super::download(state, Some(subpath), Query(params)).await.unwrap();
     let content_type = response.headers().get("Content-Type").cloned().unwrap();
     assert_eq!(content_type.to_str().unwrap(), "image/jpeg");
 }
@@ -79,9 +89,10 @@ async fn sha256_digest(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> anyhow::
 async fn file_return_checksum_test() {
     // if the path is a file the endpoint will return the content of the file
     let state = make_state();
+    let params = Params::default();
     let subpath = extract::Path("penguins.jpg".to_string());
 
-    let mut response = super::download(state, Some(subpath)).await.unwrap();
+    let mut response = super::download(state, Some(subpath), Query(params)).await.unwrap();
 
     let body = response.body_mut();
     let actual_hash = sha256_digest(body).await.unwrap();
@@ -96,9 +107,10 @@ async fn file_return_checksum_test() {
 async fn not_exists_return_type_test() {
     // if the path doesn't exist the endpoint will return a 404 error code
     let state = make_state();
+    let params = Params::default();
     let subpath = extract::Path("not_exists".to_string());
 
-    let result = super::download(state, Some(subpath)).await;
+    let result = super::download(state, Some(subpath), Query(params)).await;
     assert!(result.is_err());
 
     let status = result.unwrap_err();
@@ -110,11 +122,114 @@ async fn file_download_name_test() {
     // if the path is a file the browser will download the file with the correct name
     for filename in ["penguins.jpg", "apollon.jpg"] {
         let state = make_state();
+        let params = Params::default();
 
         let subpath = extract::Path(filename.to_string());
-        let response = super::download(state, Some(subpath)).await.unwrap();
+        let response = super::download(state, Some(subpath), Query(params)).await.unwrap();
         let content_type = response.headers().get("Content-Disposition").cloned().unwrap();
 
         assert_eq!(content_type.to_str().unwrap(), format!("attachment; filename=\"{filename}\""));
     }
+}
+
+async fn read_image(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> DynamicImage {
+    let mut buf = vec![];
+
+    while let Some(bytes) = body.data().await {
+        let bytes = bytes.unwrap();
+        buf.extend_from_slice(bytes.as_ref());
+    }
+
+    let buf = io::Cursor::new(buf);
+    let reader = ImageReader::new(buf)
+        .with_guessed_format().unwrap();
+    reader.decode().unwrap()
+}
+
+// penguins.jps 474 x 296 96 dpi
+
+#[tokio::test]
+async fn lower_max_width_test() {
+    // if the path is an image and the max_width query parameter is set
+    // to a value lower than the image's width,
+    // the endpoint will resize the image and mantain the ratio.
+
+    let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
+    let state = make_state();
+    let params = Params { 
+        max_width: Some(200),
+        max_height: None
+    };
+
+    let subpath = extract::Path(filename.to_string());
+    let mut response = super::download(state, Some(subpath), Query(params)).await.unwrap();
+    let body = response.body_mut();
+
+    let image = read_image(body).await;
+    assert!(image.width() == 200);
+}
+
+#[tokio::test]
+async fn higher_max_width_test() {
+    // if the path is an image and the max_width query parameter is higher than
+    // the image's width, the endpoint won't resize the image.
+
+    let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
+    let state = make_state();
+    let params = Params { 
+        max_width: Some(500),
+        max_height: None
+    };
+
+    let subpath = extract::Path(filename.to_string());
+    let mut response = super::download(state, Some(subpath), Query(params)).await.unwrap();
+    let body = response.body_mut();
+
+    let image = read_image(body).await;
+    assert!(image.width() == 474);
+}
+
+#[tokio::test]
+async fn lower_max_height_test() {
+    // if the path is an image and the max_height query parameter is set
+    // to a value lower than the image's height,
+    // the endpoint will resize the image and mantain the ratio.
+
+    let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
+    let state = make_state();
+    let params = Params { 
+        max_width: None,
+        max_height: Some(100)
+    };
+
+    let subpath = extract::Path(filename.to_string());
+    let mut response = super::download(state, Some(subpath), Query(params)).await.unwrap();
+    let body = response.body_mut();
+
+    let image = read_image(body).await;
+    assert!(image.height() == 100);
+}
+
+#[tokio::test]
+async fn higher_max_height_test() {
+    // if the path is an image and the max_height query parameter is higher than
+    // the image's height, the endpoint won't resize the image.
+
+    // if the path is an image and the max_height query parameter is set
+    // to a value lower than the image's height,
+    // the endpoint will resize the image and mantain the ratio.
+
+    let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
+    let state = make_state();
+    let params = Params { 
+        max_width: None,
+        max_height: Some(300)
+    };
+
+    let subpath = extract::Path(filename.to_string());
+    let mut response = super::download(state, Some(subpath), Query(params)).await.unwrap();
+    let body = response.body_mut();
+
+    let image = read_image(body).await;
+    assert!(image.height() == 296);
 }

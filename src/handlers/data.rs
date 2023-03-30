@@ -5,19 +5,21 @@ use crate::{
 
 use axum::{
     body::StreamBody,
-    extract::{self, State},
+    extract::{self, Query, State},
     http::{StatusCode, header},
     Json,
     response::{IntoResponse, Response}
 };
 use mime::Mime;
 use mime_guess;
+use serde::Deserialize;
 use tokio_stream::StreamExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tokio_stream::wrappers::ReadDirStream;
 use tokio_util::io::ReaderStream;
+
 
 /// Handles the route for the path specified by `subpath` by returning the
 /// content of the ressource.
@@ -37,9 +39,11 @@ use tokio_util::io::ReaderStream;
 /// 
 /// - `State(cfg)` - The app configuration as a shared state.
 /// - `subpath` - The path to the resource as specified in the http route.
+/// - `params` - Specify resizing options for images.
 pub async fn download(
     State(cfg): State<Arc<AppState>>,
-    subpath: Option<extract::Path<String>>
+    subpath: Option<extract::Path<String>>,
+    params: Query<Params>
 ) -> ApiResult<Response> {
     let subpath = subpath.as_ref().map(|p| p.as_str());
     let fullpath = make_fullpath(&cfg.root, subpath)?;
@@ -50,11 +54,19 @@ pub async fn download(
             .map(|children| Json(children).into_response())
     }
     else {
-        get_file_stream(&fullpath).await
+        get_file_stream(&fullpath, &params).await
             .map(|stream| stream.into_response())
     };
 
     result
+}
+
+// https://docs.rs/image/latest/image/index.html
+
+#[derive(Default, Deserialize)]
+pub struct Params {
+    max_width: Option<u32>,
+    max_height: Option<u32>,
 }
 
 /// Makes a fullpath valid on the local file system from the path of
@@ -113,11 +125,23 @@ async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<String>> {
 
 /// Returns the content of the file specified by `fullpath` as a binary
 /// stream.
-async fn get_file_stream(fullpath: &PathBuf) -> ApiResult<impl IntoResponse> {
+async fn get_file_stream(fullpath: &PathBuf, params: &Params) -> ApiResult<impl IntoResponse> {
     // Based on https://github.com/tokio-rs/axum/discussions/608
 
-    // `File` implements `AsyncRead`
-    let file = tokio::fs::File::open(fullpath).await?;
+    let resize = imgs::is_image(fullpath)
+        && imgs::needs_resize(fullpath, params.max_width, params.max_height)?;
+    let body: Response = if resize {
+        let bytes = imgs::resize(
+            fullpath,
+            params.max_width,
+            params.max_height
+        )?;
+        bytes.into_response()
+    } else {
+        let file = tokio::fs::File::open(fullpath).await?;
+        let stream = ReaderStream::new(file);
+        StreamBody::new(stream).into_response()
+    };
 
     let filename = fullpath.file_name()
         .and_then(|s| s.to_str())
@@ -135,13 +159,10 @@ async fn get_file_stream(fullpath: &PathBuf) -> ApiResult<impl IntoResponse> {
         ),
     ];
 
-    // convert the `AsyncRead` into a `Stream`
-    let stream = ReaderStream::new(file);
-    // convert the `Stream` into an `axum::body::HttpBody`
-    let body = StreamBody::new(stream);
-
     Ok((headers, body))
 }
+
+pub mod imgs;
 
 #[cfg(test)]
 mod tests;
