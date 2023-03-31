@@ -2,6 +2,8 @@ use anyhow;
 use std::{path::PathBuf, io::Cursor};
 use image::{io::Reader as ImageReader, imageops::FilterType, GenericImageView, ImageFormat};
 
+/// Check whether `filepath` is an image.
+/// It checks the content of the file, therefore the file needs to exist.
 pub fn is_image(filepath: &PathBuf) -> bool {
     ImageReader::open(filepath)
         .and_then(|img| img.with_guessed_format())
@@ -9,6 +11,9 @@ pub fn is_image(filepath: &PathBuf) -> bool {
         .unwrap_or(false)
 }
 
+/// Check whether `filepath` needs to be resized.
+/// If `filepath` doesn't exist or is not an image, the function will
+/// return an `Err`.
 pub fn needs_resize(filepath: &PathBuf, max_width: Option<u32>, max_height: Option<u32>) -> anyhow::Result<bool>
 {
     let result = if max_width.is_none() && max_height.is_none() {
@@ -24,7 +29,10 @@ pub fn needs_resize(filepath: &PathBuf, max_width: Option<u32>, max_height: Opti
     Ok(result)
 }
 
-pub fn resize(filepath: &PathBuf, max_width: Option<u32>, max_height: Option<u32>) -> anyhow::Result<Vec<u8>> {
+/// Resize the image at `filepath`.
+/// This function keeps the ratio of the image. Therefore it is not guaranteed
+/// that the new image will have the dimension `next_width`.
+pub fn resize(filepath: &PathBuf, next_width: Option<u32>, next_height: Option<u32>) -> anyhow::Result<Vec<u8>> {
     let reader = ImageReader::open(filepath)?
         .with_guessed_format()?;
 
@@ -32,8 +40,8 @@ pub fn resize(filepath: &PathBuf, max_width: Option<u32>, max_height: Option<u32
     let (width, height) = img.dimensions();
 
     let img = img.resize(
-        max_width.unwrap_or(width),
-        max_height.unwrap_or(height),
+        next_width.unwrap_or(width),
+        next_height.unwrap_or(height),
         FilterType::Nearest
     );
 
