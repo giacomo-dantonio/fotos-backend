@@ -11,6 +11,7 @@ use http_body::combinators::UnsyncBoxBody;
 use image::{io::Reader as ImageReader, DynamicImage};
 use ring::digest::{Context, Digest, SHA256};
 use ring::test;
+use rstest::*;
 use std::{env, io, sync::Arc, vec};
 
 // FIXME: replace unwrap with expect
@@ -117,19 +118,20 @@ async fn not_exists_return_type_test() {
     assert_eq!(status.status, StatusCode::from_u16(404).unwrap());
 }
 
+#[rstest]
+#[case("penguins.jpg")]
+#[case("apollon.jpg")]
 #[tokio::test]
-async fn file_download_name_test() {
+async fn file_download_name_test(#[case] filename: &str) {
     // if the path is a file the browser will download the file with the correct name
-    for filename in ["penguins.jpg", "apollon.jpg"] {
-        let state = make_state();
-        let params = Params::default();
+    let state = make_state();
+    let params = Params::default();
 
-        let subpath = extract::Path(filename.to_string());
-        let response = super::download(state, Some(subpath), Query(params)).await.unwrap();
-        let content_type = response.headers().get("Content-Disposition").cloned().unwrap();
+    let subpath = extract::Path(filename.to_string());
+    let response = super::download(state, Some(subpath), Query(params)).await.unwrap();
+    let content_type = response.headers().get("Content-Disposition").cloned().unwrap();
 
-        assert_eq!(content_type.to_str().unwrap(), format!("attachment; filename=\"{filename}\""));
-    }
+    assert_eq!(content_type.to_str().unwrap(), format!("attachment; filename=\"{filename}\""));
 }
 
 async fn read_image(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> DynamicImage {
@@ -148,8 +150,12 @@ async fn read_image(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> DynamicImag
 
 // penguins.jps 474 x 296 96 dpi
 
+#[rstest]
+#[case(None)]
+#[case(Some(false))]
+#[case(Some(true))]
 #[tokio::test]
-async fn lower_max_width_test() {
+async fn lower_max_width_test(#[case] thumbnail: Option<bool>) {
     // if the path is an image and the max_width query parameter is set
     // to a value lower than the image's width,
     // the endpoint will resize the image and mantain the ratio.
@@ -158,7 +164,8 @@ async fn lower_max_width_test() {
     let state = make_state();
     let params = Params { 
         max_width: Some(200),
-        max_height: None
+        max_height: None,
+        thumbnail
     };
 
     let subpath = extract::Path(filename.to_string());
@@ -169,8 +176,12 @@ async fn lower_max_width_test() {
     assert!(image.width() == 200);
 }
 
+#[rstest]
+#[case(None)]
+#[case(Some(false))]
+#[case(Some(true))]
 #[tokio::test]
-async fn higher_max_width_test() {
+async fn higher_max_width_test(#[case] thumbnail: Option<bool>) {
     // if the path is an image and the max_width query parameter is higher than
     // the image's width, the endpoint won't resize the image.
 
@@ -178,7 +189,8 @@ async fn higher_max_width_test() {
     let state = make_state();
     let params = Params { 
         max_width: Some(500),
-        max_height: None
+        max_height: None,
+        thumbnail
     };
 
     let subpath = extract::Path(filename.to_string());
@@ -189,8 +201,12 @@ async fn higher_max_width_test() {
     assert!(image.width() == 474);
 }
 
+#[rstest]
+#[case(None)]
+#[case(Some(false))]
+#[case(Some(true))]
 #[tokio::test]
-async fn lower_max_height_test() {
+async fn lower_max_height_test(#[case] thumbnail: Option<bool>) {
     // if the path is an image and the max_height query parameter is set
     // to a value lower than the image's height,
     // the endpoint will resize the image and mantain the ratio.
@@ -199,7 +215,8 @@ async fn lower_max_height_test() {
     let state = make_state();
     let params = Params { 
         max_width: None,
-        max_height: Some(100)
+        max_height: Some(100),
+        thumbnail
     };
 
     let subpath = extract::Path(filename.to_string());
@@ -210,8 +227,12 @@ async fn lower_max_height_test() {
     assert!(image.height() == 100);
 }
 
+#[rstest]
+#[case(None)]
+#[case(Some(false))]
+#[case(Some(true))]
 #[tokio::test]
-async fn higher_max_height_test() {
+async fn higher_max_height_test(#[case] thumbnail: Option<bool>) {
     // if the path is an image and the max_height query parameter is higher than
     // the image's height, the endpoint won't resize the image.
 
@@ -223,7 +244,8 @@ async fn higher_max_height_test() {
     let state = make_state();
     let params = Params { 
         max_width: None,
-        max_height: Some(300)
+        max_height: Some(300),
+        thumbnail
     };
 
     let subpath = extract::Path(filename.to_string());

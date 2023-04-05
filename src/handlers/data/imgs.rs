@@ -2,6 +2,7 @@ use anyhow;
 use std::{path::PathBuf, io::Cursor};
 use image::{io::Reader as ImageReader, imageops::FilterType, GenericImageView, ImageFormat};
 
+
 /// Check whether `filepath` is an image.
 /// It checks the content of the file, therefore the file needs to exist.
 pub fn is_image(filepath: &PathBuf) -> bool {
@@ -32,18 +33,25 @@ pub fn needs_resize(filepath: &PathBuf, max_width: Option<u32>, max_height: Opti
 /// Resize the image at `filepath`.
 /// This function keeps the ratio of the image. Therefore it is not guaranteed
 /// that the new image will have the dimension `next_width`.
-pub fn resize(filepath: &PathBuf, next_width: Option<u32>, next_height: Option<u32>) -> anyhow::Result<Vec<u8>> {
+/// If `thumbnail` is true a fast integer algorithm will be used for resizing.
+pub fn resize(filepath: &PathBuf, next_width: Option<u32>, next_height: Option<u32>, thumbnail: bool) -> anyhow::Result<Vec<u8>> {
     let reader = ImageReader::open(filepath)?
         .with_guessed_format()?;
 
     let img = reader.decode()?;
     let (width, height) = img.dimensions();
 
-    let img = img.resize(
-        next_width.unwrap_or(width),
-        next_height.unwrap_or(height),
-        FilterType::Nearest
-    );
+    let img = if thumbnail {
+        img.thumbnail(
+            next_width.unwrap_or(width),
+            next_height.unwrap_or(height))
+    } else {
+        img.resize(
+            next_width.unwrap_or(width),
+            next_height.unwrap_or(height),
+            FilterType::Nearest
+        )
+    };
 
     let mut bytes: Vec<u8> = Vec::new();
     img.write_to(
