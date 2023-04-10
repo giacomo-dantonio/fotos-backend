@@ -1,5 +1,5 @@
 use crate::AppState;
-use super::Params;
+use super::{FolderEntry, Params};
 
 use axum::{
     extract::{Query, State, self},
@@ -27,10 +27,16 @@ async fn get_folder_entries_test() {
         .await.unwrap();
     actual.sort();
 
+    let folder_entry = |filename: &str, mimetype: Option<&str>, is_dir: bool| FolderEntry {
+        filename: filename.to_string(),
+        mimetype: mimetype.map(|mt| mt.to_string()),
+        is_dir
+    };
+
     let expected = vec![
-        "apollon.jpg",
-        "folder",
-        "penguins.jpg"
+        folder_entry("apollon.jpg", Some("image/jpeg"), false),
+        folder_entry("folder", None, true),
+        folder_entry("penguins.jpg", Some("image/jpeg"), false),
     ];
 
     assert_eq!(actual, expected);

@@ -12,7 +12,7 @@ use axum::{
 };
 use mime::Mime;
 use mime_guess;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio_stream::StreamExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -20,6 +20,34 @@ use tokio::fs;
 use tokio_stream::wrappers::ReadDirStream;
 use tokio_util::io::ReaderStream;
 
+#[derive(Eq, PartialEq, PartialOrd, Debug, Ord, Serialize)]
+struct FolderEntry {
+    filename: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mimetype: Option<String>,
+
+    is_dir: bool
+}
+
+impl FolderEntry {
+    async fn new(parent: &Path, filename: &str) -> ApiResult<Self> {
+        let filepath = parent.join(filename);
+        if is_dir(&filepath).await? {
+            Ok(Self {
+                filename: filename.to_string(),
+                mimetype: None,
+                is_dir: true
+            })
+        } else {
+            Ok(Self {
+                filename: filename.to_string(),
+                mimetype: Some(get_mimetype(&filepath).to_string()),
+                is_dir: false
+            })
+        }
+    }
+}
 
 /// Handles the route for the path specified by `subpath` by returning the
 /// content of the ressource.
@@ -103,7 +131,7 @@ async fn is_dir(path: &PathBuf) -> ApiResult<bool>
 
 /// Returns the filename of all the entry in the folder specified by
 /// `fullpath`
-async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<String>> {
+async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<FolderEntry>> {
     let entries = fs::read_dir(fullpath).await?;
     let mut entries = ReadDirStream::new(entries);
 
@@ -116,7 +144,8 @@ async fn get_folder_entries(fullpath: &PathBuf) -> ApiResult<Vec<String>> {
                     .with_msg("Encoding issue".to_string())
                 )?
                 .to_string();
-            result.push(filename);
+
+            result.push(FolderEntry::new(fullpath, &filename).await?);
         }
     }
 
