@@ -89,12 +89,20 @@ pub async fn download(
     result
 }
 
-// https://docs.rs/image/latest/image/index.html
-
+/// Query parameters for the data endpoint.
+/// 
+/// - `max_width` - If provided will rescale the image such to have width
+///     smaller than `max_width`
+/// - `max_height` - If provided will rescale the image such to have height
+///     smaller than `max_height`
+/// - `thumbnails` - If provided and set to true a fast integer algorithm
+///     will be used for resizing.
+///     This May give aliasing artifacts if new size is close to old size.
 #[derive(Default, Deserialize)]
 pub struct Params {
     max_width: Option<u32>,
     max_height: Option<u32>,
+    thumbnail: Option<bool>
 }
 
 /// Makes a fullpath valid on the local file system from the path of
@@ -163,7 +171,8 @@ async fn get_file_stream(fullpath: &PathBuf, params: &Params) -> ApiResult<impl 
         let bytes = imgs::resize(
             fullpath,
             params.max_width,
-            params.max_height
+            params.max_height,
+            params.thumbnail.unwrap_or(false)
         )?;
         bytes.into_response()
     } else {
