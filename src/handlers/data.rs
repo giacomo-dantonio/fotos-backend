@@ -173,7 +173,7 @@ async fn get_file_stream(fullpath: &PathBuf, params: &Params) -> ApiResult<impl 
             params.max_width,
             params.max_height,
             params.thumbnail.unwrap_or(false)
-        )?;
+        ).await?;
         bytes.into_response()
     } else {
         let file = tokio::fs::File::open(fullpath).await?;
