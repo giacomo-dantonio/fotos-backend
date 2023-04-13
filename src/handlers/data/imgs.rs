@@ -6,7 +6,7 @@ use image::{
     GenericImageView,
     ImageFormat
 };
-use image::DynamicImage::{ImageRgb8, self};
+use image::DynamicImage;
 
 
 /// Check whether `filepath` is an image.
@@ -37,11 +37,12 @@ pub fn needs_resize(filepath: &PathBuf, max_width: Option<u32>, max_height: Opti
 }
 
 /// Load the image at `filepath`.
+#[cfg(feature = "turbojpeg")]
 async fn load(filepath: &PathBuf) -> anyhow::Result<DynamicImage> {
     let img = if ImageFormat::from_path(filepath)? == ImageFormat::Jpeg {
         // Use turbojpeg for better performance
         let jpeg_data = tokio::fs::read(filepath).await?;
-        ImageRgb8(turbojpeg::decompress_image(&jpeg_data)?)
+        DynamicImage::ImageRgb8(turbojpeg::decompress_image(&jpeg_data)?)
     } else {
         let reader = ImageReader::open(filepath)?
             .with_guessed_format()?;
@@ -52,7 +53,17 @@ async fn load(filepath: &PathBuf) -> anyhow::Result<DynamicImage> {
     Ok(img)
 }
 
+/// Load the image at `filepath`.
+#[cfg(not(feature = "turbojpeg"))]
+async fn load(filepath: &PathBuf) -> anyhow::Result<DynamicImage> {
+    let reader = ImageReader::open(filepath)?
+        .with_guessed_format()?;
+    let img = reader.decode()?;
+    Ok(img)
+}
+
 /// Encode `image` using the format of the original `filepath`.
+#[cfg(feature = "turbojpeg")]
 fn encode(filepath: &PathBuf, image: DynamicImage) -> anyhow::Result<Vec<u8>> {
     let bytes = if ImageFormat::from_path(filepath)? == ImageFormat::Jpeg {
         // Use turbojpeg for better performance
@@ -69,6 +80,18 @@ fn encode(filepath: &PathBuf, image: DynamicImage) -> anyhow::Result<Vec<u8>> {
         )?;
         bytes
     };
+
+    Ok(bytes)
+}
+
+/// Encode `image` using the format of the original `filepath`.
+#[cfg(not(feature = "turbojpeg"))]
+fn encode(filepath: &PathBuf, image: DynamicImage) -> anyhow::Result<Vec<u8>> {
+    let mut bytes: Vec<u8> = Vec::new();
+    image.write_to(
+        &mut Cursor::new(&mut bytes),
+        ImageFormat::from_path(filepath)?
+    )?;
 
     Ok(bytes)
 }
