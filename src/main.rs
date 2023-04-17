@@ -2,11 +2,12 @@ use axum::{
     routing::get,
     Router
 };
+use sqlx::sqlite::SqlitePoolOptions;
 use std::{sync::Arc, str::FromStr};
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
 
-use fotos_backend::{handlers, AppState};
+use fotos_backend::{handlers, AppConf, AppState};
 
 static APPNAME : &str = "foto_backend";
 
@@ -15,10 +16,20 @@ async fn main() -> anyhow::Result<()> {
     // Load configuration from file
     let cfg_path = confy::get_configuration_file_path(APPNAME, None)
         .unwrap();
-    let app_conf : AppState = confy::load(APPNAME, None)?;
+    let app_conf : AppConf = confy::load(APPNAME, None)?;
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect("sqlite://test.db")
+        .await?;
+
+    let app_state = AppState {
+        conf: app_conf,
+        pool
+    };
 
     // Set up tracing and logging
-    let max_level: Level = Level::from_str(app_conf.max_level.as_str())
+    let max_level: Level = Level::from_str(app_state.conf.max_level.as_str())
         .unwrap_or(Level::INFO);
     tracing_subscriber::fmt()
         .with_target(false)
@@ -29,8 +40,8 @@ async fn main() -> anyhow::Result<()> {
     tracing::debug!("Loaded config {}", cfg_path.to_str().unwrap_or(""));
 
     // Setup routes
-    let addr = app_conf.connection.parse()?;
-    let shared_state = Arc::new(app_conf);
+    let addr = app_state.conf.connection.parse()?;
+    let shared_state = Arc::new(app_state);
     let app = Router::new()
         .route("/data/*subpath", get(handlers::download))
         .route("/data", get(handlers::download))

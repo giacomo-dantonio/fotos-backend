@@ -1,4 +1,4 @@
-use crate::AppState;
+use crate::{AppConf, AppState};
 use super::{FolderEntry, Params};
 
 use axum::{
@@ -12,6 +12,7 @@ use image::{io::Reader as ImageReader, DynamicImage};
 use ring::digest::{Context, Digest, SHA256};
 use ring::test;
 use rstest::*;
+use sqlx::SqlitePool;
 use std::{env, io, sync::Arc, vec};
 
 // FIXME: replace unwrap with expect
@@ -43,23 +44,32 @@ async fn get_folder_entries_test() {
     assert_eq!(actual, expected);
 }
 
-fn make_state() -> State<Arc<AppState>> {
+async fn make_state() -> State<Arc<AppState>> {
     let root = env::current_dir()
         .unwrap()
         .join("data");
     let root = root.to_str().unwrap();
-
-    State(Arc::new(AppState {
+    let conf = AppConf {
         root: root.to_string(),
         connection: "0.0.0.0:3000".to_string(),
         max_level: "DEBUG".to_string()
-    }))
+    };
+
+    let pool = SqlitePool::connect("sqlite://test.db")
+        .await
+        .unwrap();
+    let state = AppState {
+        conf,
+        pool
+    };
+
+    State(Arc::new(state))
 }
 
 #[tokio::test]
 async fn folder_return_type_test() {
     // if the path is a folder the endpoint will return a json
-    let state = make_state();
+    let state = make_state().await;
     let params = Params::default();
     let subpath = extract::Path("folder".to_string());
 
@@ -72,7 +82,7 @@ async fn folder_return_type_test() {
 #[tokio::test]
 async fn file_return_type_test() {
     // if the path is a file the response headers will contain the content type of the file
-    let state = make_state();
+    let state = make_state().await;
     let params = Params::default();
     let subpath = extract::Path("penguins.jpg".to_string());
 
@@ -95,7 +105,7 @@ async fn sha256_digest(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> anyhow::
 #[tokio::test]
 async fn file_return_checksum_test() {
     // if the path is a file the endpoint will return the content of the file
-    let state = make_state();
+    let state = make_state().await;
     let params = Params::default();
     let subpath = extract::Path("penguins.jpg".to_string());
 
@@ -113,7 +123,7 @@ async fn file_return_checksum_test() {
 #[tokio::test]
 async fn not_exists_return_type_test() {
     // if the path doesn't exist the endpoint will return a 404 error code
-    let state = make_state();
+    let state = make_state().await;
     let params = Params::default();
     let subpath = extract::Path("not_exists".to_string());
 
@@ -130,7 +140,7 @@ async fn not_exists_return_type_test() {
 #[tokio::test]
 async fn file_download_name_test(#[case] filename: &str) {
     // if the path is a file the browser will download the file with the correct name
-    let state = make_state();
+    let state = make_state().await;
     let params = Params::default();
 
     let subpath = extract::Path(filename.to_string());
@@ -167,7 +177,7 @@ async fn lower_max_width_test(#[case] thumbnail: Option<bool>) {
     // the endpoint will resize the image and mantain the ratio.
 
     let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
-    let state = make_state();
+    let state = make_state().await;
     let params = Params { 
         max_width: Some(200),
         max_height: None,
@@ -192,7 +202,7 @@ async fn higher_max_width_test(#[case] thumbnail: Option<bool>) {
     // the image's width, the endpoint won't resize the image.
 
     let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
-    let state = make_state();
+    let state = make_state().await;
     let params = Params { 
         max_width: Some(500),
         max_height: None,
@@ -218,7 +228,7 @@ async fn lower_max_height_test(#[case] thumbnail: Option<bool>) {
     // the endpoint will resize the image and mantain the ratio.
 
     let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
-    let state = make_state();
+    let state = make_state().await;
     let params = Params { 
         max_width: None,
         max_height: Some(100),
@@ -247,7 +257,7 @@ async fn higher_max_height_test(#[case] thumbnail: Option<bool>) {
     // the endpoint will resize the image and mantain the ratio.
 
     let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
-    let state = make_state();
+    let state = make_state().await;
     let params = Params { 
         max_width: None,
         max_height: Some(300),

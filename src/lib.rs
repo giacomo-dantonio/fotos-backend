@@ -1,4 +1,5 @@
 use serde::{Serialize, Deserialize};
+use sqlx::SqlitePool;
 
 pub mod api;
 pub mod handlers;
@@ -6,7 +7,7 @@ pub mod handlers;
 /// The configuration of the application.
 /// Will be serialized to and deserialized from toml using the `confy` crate.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AppState {
+pub struct AppConf {
     /// The root folder of the content that will be served through the server.
     pub root: String,
 
@@ -26,7 +27,12 @@ pub struct AppState {
     pub max_level: String
 }
 
-impl Default for AppState {
+pub struct AppState {
+    pub conf: AppConf,
+    pub pool: SqlitePool
+}
+
+impl Default for AppConf {
     fn default() -> Self {
         Self {
             root: "./data".to_string(),
