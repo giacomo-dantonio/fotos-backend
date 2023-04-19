@@ -1,4 +1,4 @@
-use crate::{AppConf, AppState};
+use crate::{AppConf, AppState, infrastructure};
 use super::{FolderEntry, Params};
 
 use axum::{
@@ -16,6 +16,14 @@ use sqlx::SqlitePool;
 use std::{env, io, sync::Arc, vec};
 
 // FIXME: replace unwrap with expect
+
+static DB_URL: &str = "sqlite://test.db";
+
+async fn setup() {
+    infrastructure::ensure_db(DB_URL).await
+        .expect("Database migration failed");
+}
+
 
 #[tokio::test]
 async fn get_folder_entries_test() {
@@ -55,7 +63,7 @@ async fn make_state() -> State<Arc<AppState>> {
         max_level: "DEBUG".to_string()
     };
 
-    let pool = SqlitePool::connect("sqlite://test.db")
+    let pool = SqlitePool::connect(DB_URL)
         .await
         .unwrap();
     let state = AppState {
@@ -68,6 +76,8 @@ async fn make_state() -> State<Arc<AppState>> {
 
 #[tokio::test]
 async fn folder_return_type_test() {
+    setup().await;
+
     // if the path is a folder the endpoint will return a json
     let state = make_state().await;
     let params = Params::default();
@@ -81,6 +91,8 @@ async fn folder_return_type_test() {
 
 #[tokio::test]
 async fn file_return_type_test() {
+    setup().await;
+
     // if the path is a file the response headers will contain the content type of the file
     let state = make_state().await;
     let params = Params::default();
@@ -88,6 +100,7 @@ async fn file_return_type_test() {
 
     let response = super::download(state, Some(subpath), Query(params)).await.unwrap();
     let content_type = response.headers().get("Content-Type").cloned().unwrap();
+
     assert_eq!(content_type.to_str().unwrap(), "image/jpeg");
 }
 
@@ -104,6 +117,8 @@ async fn sha256_digest(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> anyhow::
 
 #[tokio::test]
 async fn file_return_checksum_test() {
+    setup().await;
+
     // if the path is a file the endpoint will return the content of the file
     let state = make_state().await;
     let params = Params::default();
@@ -122,6 +137,8 @@ async fn file_return_checksum_test() {
 
 #[tokio::test]
 async fn not_exists_return_type_test() {
+    setup().await;
+
     // if the path doesn't exist the endpoint will return a 404 error code
     let state = make_state().await;
     let params = Params::default();
@@ -139,6 +156,8 @@ async fn not_exists_return_type_test() {
 #[case("apollon.jpg")]
 #[tokio::test]
 async fn file_download_name_test(#[case] filename: &str) {
+    setup().await;
+
     // if the path is a file the browser will download the file with the correct name
     let state = make_state().await;
     let params = Params::default();
@@ -172,6 +191,8 @@ async fn read_image(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> DynamicImag
 #[case(Some(true))]
 #[tokio::test]
 async fn lower_max_width_test(#[case] thumbnail: Option<bool>) {
+    setup().await;
+
     // if the path is an image and the max_width query parameter is set
     // to a value lower than the image's width,
     // the endpoint will resize the image and mantain the ratio.
@@ -198,6 +219,8 @@ async fn lower_max_width_test(#[case] thumbnail: Option<bool>) {
 #[case(Some(true))]
 #[tokio::test]
 async fn higher_max_width_test(#[case] thumbnail: Option<bool>) {
+    setup().await;
+
     // if the path is an image and the max_width query parameter is higher than
     // the image's width, the endpoint won't resize the image.
 
@@ -223,6 +246,8 @@ async fn higher_max_width_test(#[case] thumbnail: Option<bool>) {
 #[case(Some(true))]
 #[tokio::test]
 async fn lower_max_height_test(#[case] thumbnail: Option<bool>) {
+    setup().await;
+
     // if the path is an image and the max_height query parameter is set
     // to a value lower than the image's height,
     // the endpoint will resize the image and mantain the ratio.
@@ -249,6 +274,8 @@ async fn lower_max_height_test(#[case] thumbnail: Option<bool>) {
 #[case(Some(true))]
 #[tokio::test]
 async fn higher_max_height_test(#[case] thumbnail: Option<bool>) {
+    setup().await;
+
     // if the path is an image and the max_height query parameter is higher than
     // the image's height, the endpoint won't resize the image.
 

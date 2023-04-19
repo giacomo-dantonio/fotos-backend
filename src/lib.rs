@@ -3,6 +3,7 @@ use sqlx::SqlitePool;
 
 pub mod api;
 pub mod handlers;
+pub mod infrastructure;
 
 /// The configuration of the application.
 /// Will be serialized to and deserialized from toml using the `confy` crate.

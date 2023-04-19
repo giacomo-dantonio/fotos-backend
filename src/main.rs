@@ -7,9 +7,16 @@ use std::{sync::Arc, str::FromStr};
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
 
-use fotos_backend::{handlers, AppConf, AppState};
+use fotos_backend::{
+    handlers,
+    infrastructure,
+    AppConf,
+    AppState
+};
 
 static APPNAME : &str = "foto_backend";
+
+static DB_URL: &str = "sqlite://sqlite.db";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -17,6 +24,23 @@ async fn main() -> anyhow::Result<()> {
     let cfg_path = confy::get_configuration_file_path(APPNAME, None)
         .unwrap();
     let app_conf : AppConf = confy::load(APPNAME, None)?;
+
+    // Set up tracing and logging
+    let max_level: Level = Level::from_str(app_conf.max_level.as_str())
+        .unwrap_or(Level::INFO);
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_max_level(max_level)
+        .compact()
+        .init();
+
+    tracing::debug!("Loaded config {}", cfg_path.to_str().unwrap_or(""));
+
+    if infrastructure::ensure_db(DB_URL).await? {
+        tracing::debug!("Created database {}", DB_URL);
+    } else {
+        tracing::debug!("Database {} already exists", DB_URL);
+    }
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
@@ -27,17 +51,6 @@ async fn main() -> anyhow::Result<()> {
         conf: app_conf,
         pool
     };
-
-    // Set up tracing and logging
-    let max_level: Level = Level::from_str(app_state.conf.max_level.as_str())
-        .unwrap_or(Level::INFO);
-    tracing_subscriber::fmt()
-        .with_target(false)
-        .with_max_level(max_level)
-        .compact()
-        .init();
-
-    tracing::debug!("Loaded config {}", cfg_path.to_str().unwrap_or(""));
 
     // Setup routes
     let addr = app_state.conf.connection.parse()?;
