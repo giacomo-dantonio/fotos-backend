@@ -12,7 +12,7 @@ use image::{io::Reader as ImageReader, DynamicImage};
 use ring::digest::{Context, Digest, SHA256};
 use ring::test;
 use rstest::*;
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, Sqlite};
 use std::{env, io, sync::Arc, vec};
 
 // FIXME: replace unwrap with expect
@@ -20,7 +20,7 @@ use std::{env, io, sync::Arc, vec};
 static DB_URL: &str = "sqlite://test.db";
 
 async fn setup() {
-    infrastructure::ensure_db(DB_URL).await
+    infrastructure::ensure_db::<Sqlite>(DB_URL).await
         .expect("Database migration failed");
 }
 
