@@ -65,16 +65,16 @@ impl FolderEntry {
 /// 
 /// # Arguments
 /// 
-/// - `State(cfg)` - The app configuration as a shared state.
+/// - `State(state)` - The shared state of the application.
 /// - `subpath` - The path to the resource as specified in the http route.
 /// - `params` - Specify resizing options for images.
 pub async fn download(
-    State(cfg): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     subpath: Option<extract::Path<String>>,
     params: Query<Params>
 ) -> ApiResult<Response> {
     let subpath = subpath.as_ref().map(|p| p.as_str());
-    let fullpath = make_fullpath(&cfg.root, subpath)?;
+    let fullpath = make_fullpath(&state.conf.root, subpath)?;
     let is_dir = is_dir(&fullpath).await?;
 
     let result: ApiResult<Response> = if is_dir {

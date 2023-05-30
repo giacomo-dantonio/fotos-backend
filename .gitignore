@@ -1,2 +1,4 @@
 /target
 .vscode
+sqlite.db*
+test.db*
