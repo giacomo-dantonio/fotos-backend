@@ -1,12 +1,22 @@
-use sqlx::{Sqlite, migrate::MigrateDatabase};
+use sqlx::{migrate::{MigrateDatabase, Migrate}, Pool, Database};
 
-pub async fn ensure_db(url: &str) -> anyhow::Result<bool>{
-    if !Sqlite::database_exists(url).await.unwrap_or(false) {
-        Sqlite::create_database(url).await?;
+pub async fn ensure_db<A>(url: &str) -> anyhow::Result<bool>
+    where A: MigrateDatabase
+{
+    if !A::database_exists(url).await.unwrap_or(false) {
+        A::create_database(url).await?;
         Ok(true)
     } else {
         Ok(false)
     }
 }
 
-// sqlx::migrate!().run(<&your_pool OR &mut your_connection>).await?;
+pub async fn migrate<A, B>(pool: &Pool<A>) -> anyhow::Result<()>
+    where
+        A: Database<Connection = B>,
+        B: Migrate
+{
+    sqlx::migrate!().run(pool).await?;
+    Ok(())
+}
+

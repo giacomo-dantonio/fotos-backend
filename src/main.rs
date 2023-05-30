@@ -2,7 +2,7 @@ use axum::{
     routing::get,
     Router
 };
-use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::{sqlite::SqlitePoolOptions, Sqlite};
 use std::{sync::Arc, str::FromStr};
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::debug!("Loaded config {}", cfg_path.to_str().unwrap_or(""));
 
-    if infrastructure::ensure_db(DB_URL).await? {
+    if infrastructure::ensure_db::<Sqlite>(DB_URL).await? {
         tracing::debug!("Created database {}", DB_URL);
     } else {
         tracing::debug!("Database {} already exists", DB_URL);
@@ -44,8 +44,11 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect("sqlite://test.db")
+        .connect(DB_URL)
         .await?;
+
+    infrastructure::migrate(&pool).await?;
+    tracing::debug!("DB Migration succesful");
 
     let app_state = AppState {
         conf: app_conf,
