@@ -1,3 +1,4 @@
-pub mod data;
+mod data;
+mod tags;
 
 pub use data::download;

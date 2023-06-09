@@ -49,13 +49,13 @@ impl FolderEntry {
     }
 }
 
-/// Handles the route for the path specified by `subpath` by returning the
+/// Handles the route for the path specified by `data/<subpath>` by returning the
 /// content of the ressource.
 /// 
 /// For example if the root folder is `/opt/content`
 /// and the client does an http request like
 /// 
-/// #    GET /my/little/pony
+/// #    GET /data/my/little/pony
 ///
 /// The endpoint will return the content of the file
 /// `/opt/content/my/little/pony`.
