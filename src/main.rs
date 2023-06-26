@@ -1,5 +1,5 @@
 use axum::{
-    routing::get,
+    routing::{get, post},
     Router
 };
 use sqlx::{sqlite::SqlitePoolOptions, Sqlite};
@@ -61,6 +61,8 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/data/*subpath", get(handlers::download))
         .route("/data", get(handlers::download))
+        .route("/tags", get(handlers::get_tags))
+        .route("/tags", post(handlers::create_tag))
         .with_state(shared_state)
         .layer(
             TraceLayer::new_for_http()
