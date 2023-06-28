@@ -9,7 +9,8 @@ use crate::{
 };
 
 async fn insert_tags(names: impl Iterator<Item=&str>, pool: &SqlitePool) {
-    sqlx::query("DELETE FROM tags")
+    // FIXME: this has concurrency issues when the tests run in parallel
+    sqlx::query("DELETE FROM tags WHERE 1=1")
         .execute(pool)
         .await
         .expect("Unable to delete old tags");
@@ -31,7 +32,7 @@ async fn test_get_tags() {
     let state = make_state().await;
     setup(&state.pool).await;
 
-    let tagnames = vec![
+    let tagnames = [
         "Landscape".to_string(),
         "Sea".to_string(),
         "Mountain".to_string()
@@ -52,7 +53,7 @@ async fn test_get_tags() {
         .map(|t| t.tagname)
         .collect();
 
-    assert_eq!(tagnames, actual);
+    assert_eq!(tagnames, *actual);
 }
 
 #[tokio::test]
@@ -114,9 +115,15 @@ async fn test_create_tag(#[case] duplicate: bool) {
         .expect("Failed to get tags from the handler");
     assert_eq!((*response).len(), if duplicate { 1 } else { 0 });
 
-    let response: Json<Tag> = super::create_tag(state.clone(), Path(tagname.to_string()))
-        .await
-        .expect("Failed to create the tag");
+    let response = super::create_tag(state.clone(), Path(tagname.to_string()))
+        .await;
 
-    assert_eq!((*response).tagname, tagname);
+    if !duplicate {
+        let response = response.expect("Failed to create the tag");        
+        assert_eq!((*response).tagname, tagname);
+    } else if let Err(error) = response {
+        assert_eq!(error.status, 409);
+    } else {
+        assert!(false, "Response should have an error status code");
+    }
 }

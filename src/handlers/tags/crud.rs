@@ -1,14 +1,15 @@
 use crate::{
-    api::error::ApiResult,
+    api::error::{ApiResult, ApiError},
     AppState,
     handlers::tags::models::Tag
 };
 
 use axum::{
     extract::{Query, State, Path},
-    response::Response, Json
+    Json, http::StatusCode
 };
 use serde::Deserialize;
+use uuid::Uuid;
 use std::sync::Arc;
 
 /// Search for tags.
@@ -49,13 +50,24 @@ pub async fn create_tag(
     State(state): State<Arc<AppState>>,
     Path(tagname): Path<String>
 ) -> ApiResult<Json<Tag>> {
-    let count: u64 = sqlx::query_as(
-        "SELECT COUNT(*) FROM tags WHERE tagname=$1"
-    ).bind(tagname)
-    .fetch_one(&state.pool)
+    let row = sqlx::query(
+        "SELECT * FROM tags WHERE tagname=$1 LIMIT 1"
+    ).bind(&tagname)
+    .fetch_optional(&state.pool)
     .await?;
 
-    unimplemented!()
+    if row.is_none() {
+        let id = Uuid::new_v4();
+        sqlx::query("INSERT INTO tags (id, tagname) VALUES ($1, $2)")
+            .bind(id.to_string())
+            .bind(&tagname)
+            .execute(&state.pool)
+            .await?;
+        let tag = Tag { id: id.to_string(), tagname: tagname };
+        Ok(Json(tag))
+    } else {
+        Err(ApiError::new(StatusCode::CONFLICT))
+    }
 }
 
 /// Query parameters for the get_tags endpoint.
