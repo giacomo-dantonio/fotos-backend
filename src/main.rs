@@ -2,7 +2,7 @@ use axum::{
     routing::{get, post},
     Router
 };
-use sqlx::{sqlite::SqlitePoolOptions, Sqlite};
+use sqlx::{Sqlite, pool::PoolOptions};
 use std::{sync::Arc, str::FromStr};
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::debug!("Database {} already exists", DB_URL);
     }
 
-    let pool = SqlitePoolOptions::new()
+    let pool = PoolOptions::<Sqlite>::new()
         .max_connections(5)
         .connect(DB_URL)
         .await?;
