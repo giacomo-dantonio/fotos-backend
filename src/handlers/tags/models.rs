@@ -6,3 +6,5 @@ pub struct Tag {
     pub id: String,
     pub tagname: String
 }
+
+// FIXME: add models for files and mapping them to tags

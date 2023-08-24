@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 pub async fn tag_path(
     State(state): State<Arc<AppState>>,
-    tag: extract::Path<Uuid>,
+    tagid: extract::Path<String>,
     subpath: extract::Path<String>,
 ) -> ApiResult<Response> {
     unimplemented!()
@@ -20,8 +20,19 @@ pub async fn tag_path(
 
 pub async fn get_by_tag(
     State(state): State<Arc<AppState>>,
-    tag: extract::Path<Uuid>,
+    tag: extract::Path<String>,
     subpath: Option<extract::Path<String>>,
 ) -> ApiResult<Response> {
     unimplemented!()
 }
+
+pub async fn untag_path(
+    State(state): State<Arc<AppState>>,
+    tag: extract::Path<String>,
+    subpath: extract::Path<String>,
+) -> ApiResult<Response> {
+    unimplemented!()
+}
+
+#[cfg(test)]
+mod tests;

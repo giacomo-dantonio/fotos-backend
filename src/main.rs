@@ -1,5 +1,5 @@
 use axum::{
-    routing::{get, post},
+    routing::{get, post, delete},
     Router
 };
 use sqlx::{Sqlite, pool::PoolOptions};
@@ -63,6 +63,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/data", get(handlers::download))
         .route("/tags", get(handlers::get_tags))
         .route("/tags", post(handlers::create_tag))
+        .route("/tag/{tagid}/*subpath", post(handlers::tag_path))
+        .route("/tag/{tagid}/*subpath", delete(handlers::untag_path))
+        .route("/tag/{tagid}", get(handlers::get_by_tag))
+        .route("/tag/{tagid}/*subpath", get(handlers::get_by_tag))
         .with_state(shared_state)
         .layer(
             TraceLayer::new_for_http()

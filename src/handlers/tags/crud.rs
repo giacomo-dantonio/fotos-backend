@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 /// Search for tags.
 /// 
-/// Handles request of the type
+/// Handles requests of type
 /// 
 /// #    GET /tags
 /// #    GET /tags?search=pony
@@ -46,6 +46,18 @@ pub async fn get_tags(
     Ok(tags.into())
 }
 
+/// Create a new tag
+/// 
+/// Handles requests of type
+/// 
+/// #   POST /tags/{tagname}
+/// 
+/// # Returns
+/// The DTO of the newly created tag of the form
+/// 
+///     { id: uuid, tagname: str }
+/// 
+/// if successful, otherwise 409 CONFLICT.
 pub async fn create_tag(
     State(state): State<Arc<AppState>>,
     Path(tagname): Path<String>

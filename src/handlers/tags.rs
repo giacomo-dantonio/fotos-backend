@@ -2,6 +2,5 @@ mod crud;
 mod models;
 mod files;
 
-pub use crud::get_tags;
-pub use crud::create_tag;
-pub use files::tag_path;
+pub use crud::{get_tags, create_tag};
+pub use files::{tag_path, untag_path, get_by_tag};
