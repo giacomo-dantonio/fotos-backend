@@ -5,7 +5,7 @@ use super::{FolderEntry, Params};
 use axum::{
     extract::{Query, self},
     http::StatusCode,
-    body::{HttpBody}
+    body::HttpBody
 };
 use bytes::Bytes;
 use http_body::combinators::UnsyncBoxBody;

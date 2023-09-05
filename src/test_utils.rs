@@ -2,6 +2,7 @@ use std::{sync::Arc, env};
 
 use axum::extract::State;
 use sqlx::{SqlitePool, Sqlite};
+use uuid::Uuid;
 
 use crate::{AppState, AppConf, infrastructure};
 
@@ -34,4 +35,22 @@ pub async fn make_state() -> State<Arc<AppState>> {
     };
 
     State(Arc::new(state))
+}
+
+pub async fn insert_tags(names: impl Iterator<Item=&str>, pool: &SqlitePool) {
+    // FIXME: this has concurrency issues when the tests run in parallel
+    sqlx::query("DELETE FROM tags WHERE 1=1")
+        .execute(pool)
+        .await
+        .expect("Unable to delete old tags");
+
+    for name in names {
+        let id = Uuid::new_v4();
+        sqlx::query("INSERT INTO tags (id, tagname) VALUES ($1, $2)")
+            .bind(id.to_string())
+            .bind(name)
+            .execute(pool)
+            .await
+            .expect("Unable to insert tag");
+    }
 }

@@ -1,30 +1,10 @@
 use axum::{extract::{Query, Path}, Json};
 use rstest::rstest;
-use sqlx::sqlite::SqlitePool;
-use uuid::Uuid;
 
 use crate::{
     handlers::tags::models::Tag,
-    test_utils::{setup, make_state}
+    test_utils::{setup, make_state, insert_tags}
 };
-
-async fn insert_tags(names: impl Iterator<Item=&str>, pool: &SqlitePool) {
-    // FIXME: this has concurrency issues when the tests run in parallel
-    sqlx::query("DELETE FROM tags WHERE 1=1")
-        .execute(pool)
-        .await
-        .expect("Unable to delete old tags");
-
-    for name in names {
-        let id = Uuid::new_v4();
-        sqlx::query("INSERT INTO tags (id, tagname) VALUES ($1, $2)")
-            .bind(id.to_string())
-            .bind(name)
-            .execute(pool)
-            .await
-            .expect("Unable to insert tag");
-    }
-}
 
 #[tokio::test]
 async fn test_get_tags() {

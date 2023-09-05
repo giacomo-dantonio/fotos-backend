@@ -1,9 +1,50 @@
+use crate::test_utils::{setup, make_state, insert_tags};
+use axum::{extract, http::StatusCode};
 use rstest::rstest;
+use sqlx::Row;
 
 #[tokio::test]
 async fn test_tag_path_files_record() {
     // the tag_path endpoint creates a record in the files table, if that doesn't exist yet
-    unimplemented!();
+
+    let state = make_state().await;
+    let pool = state.pool.clone();
+
+    setup(&pool).await;
+
+    // Seed the database
+    let tagnames = [
+        "Landscape".to_string(),
+        "Sea".to_string(),
+        "Mountain".to_string()
+    ];
+    insert_tags(
+        tagnames.iter().map(|s| s.as_str()),
+        &state.pool
+    ).await;
+
+    // Get endpoint parameters
+    let tagid : String = sqlx::query("SELECT id FROM tags WHERE tagname='$1'")
+        .bind(&tagnames[0])
+        .fetch_one(&pool).await
+        .expect("Cannot fetch tag id")
+        .get("id");
+    let subpath = "penguins.jpg".to_string();
+
+    // Call the endpoint
+    let response =
+        super::tag_path(state, extract::Path(tagid), extract::Path(subpath.clone())).await
+        .expect("Endpoint returned an Err");
+    assert_eq!(StatusCode::OK, response.status());
+
+    // Check assertion on the database
+    let row = sqlx::query(
+            "SELECT * FROM files WHERE relative_path=$1 LIMIT 1"
+        ).bind(subpath)
+        .fetch_optional(&pool)
+        .await
+        .expect("Error while querying the database");
+    assert!(row.is_some());
 }
 
 #[rstest]
