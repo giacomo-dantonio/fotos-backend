@@ -24,7 +24,7 @@ async fn test_tag_path_files_record() {
     ).await;
 
     // Get endpoint parameters
-    let tagid : String = sqlx::query("SELECT id FROM tags WHERE tagname='$1'")
+    let tagid : String = sqlx::query("SELECT id FROM tags WHERE tagname=$1")
         .bind(&tagnames[0])
         .fetch_one(&pool).await
         .expect("Cannot fetch tag id")
