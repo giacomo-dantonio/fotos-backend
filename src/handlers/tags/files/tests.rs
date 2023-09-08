@@ -1,8 +1,16 @@
 use crate::test_utils::{setup, make_state, insert_tags};
 use axum::{extract, http::StatusCode};
 use rstest::rstest;
-use sqlx::Row;
+use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
+
+async fn get_tag_id(pool: &SqlitePool, tagname: &str) -> String {
+    sqlx::query("SELECT id FROM tags WHERE tagname=$1")
+        .bind(tagname)
+        .fetch_one(pool).await
+        .expect("Cannot fetch tag id")
+        .get("id")
+}
 
 #[tokio::test]
 async fn test_tag_path_files_record() {
@@ -18,11 +26,7 @@ async fn test_tag_path_files_record() {
     insert_tags(tagnames.into_iter(), &pool).await;
 
     // Get endpoint parameters
-    let tag_id : String = sqlx::query("SELECT id FROM tags WHERE tagname=$1")
-        .bind(&tagnames[0])
-        .fetch_one(&pool).await
-        .expect("Cannot fetch tag id")
-        .get("id");
+    let tag_id = get_tag_id(&pool, &tagnames[0]).await;
     let subpath = "penguins.jpg";
 
     // Call the endpoint
@@ -57,11 +61,7 @@ async fn test_tag_path_filetag(#[case] files_exists: bool, #[case] filetags_exis
 
     let tagnames = ["Test Tag"];
     insert_tags(tagnames.into_iter(), &pool).await;
-    let tag_id : String = sqlx::query("SELECT id FROM tags WHERE tagname=$1")
-        .bind(&tagnames[0])
-        .fetch_one(&pool).await
-        .expect("Cannot fetch tag id")
-        .get("id");
+    let tag_id = get_tag_id(&pool, &tagnames[0]).await;
 
     let subpath = "penguins.jpg";
     if files_exists || filetags_exists {
@@ -74,7 +74,7 @@ async fn test_tag_path_filetag(#[case] files_exists: bool, #[case] filetags_exis
 
         if filetags_exists {
             sqlx::query("INSERT INTO filetags (tag_id, file_id) VALUES ($1, $2)")
-                .bind(file_id.to_string()).bind(&tag_id)
+                .bind(&tag_id).bind(file_id.to_string())
                 .execute(&pool).await
                 .expect("Cannot insert tag");
         }
@@ -99,13 +99,38 @@ async fn test_tag_path_filetag(#[case] files_exists: bool, #[case] filetags_exis
 #[tokio::test]
 async fn test_tag_path_file_doesnt_exist() {
     // the tag_path endpoint responds with a 404, if the path doesn't exist
-    unimplemented!();
+    let state = make_state().await;
+    let pool = state.pool.clone();
+
+    setup(&pool).await;
+
+    let tagnames = ["Test Tag"];
+    insert_tags(tagnames.into_iter(), &pool).await;
+    
+    let tag_id = get_tag_id(&pool, &tagnames[0]).await;
+    let subpath = "molise.jpg";
+
+    // Call the endpoint
+    let response =
+        super::tag_path(state, extract::Path(tag_id), extract::Path(subpath.to_string())).await;
+    assert!(response.is_err_and(|apierr| apierr.status == StatusCode::NOT_FOUND));
 }
 
 #[tokio::test]
 async fn test_tag_path_tag_doesnt_exist() {
     // the tag_path endpoint responds with a 404, if the tag doesn't exist
-    unimplemented!();
+    let state = make_state().await;
+    let pool = state.pool.clone();
+
+    setup(&pool).await;
+
+    let tag_id = Uuid::new_v4().to_string();
+    let subpath = "penguins.jpg";
+
+    // Call the endpoint
+    let response =
+        super::tag_path(state, extract::Path(tag_id), extract::Path(subpath.to_string())).await;
+    assert!(response.is_err_and(|apierr| apierr.status == StatusCode::NOT_FOUND));
 }
 
 #[tokio::test]
