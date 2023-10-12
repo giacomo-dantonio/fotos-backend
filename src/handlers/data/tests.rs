@@ -1,4 +1,4 @@
-use crate::test_utils::{setup, make_state};
+use crate::test_utils::make_state;
 
 use super::{FolderEntry, Params};
 
@@ -48,7 +48,6 @@ async fn get_folder_entries_test() {
 async fn folder_return_type_test() {
     // if the path is a folder the endpoint will return a json
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let params = Params::default();
     let subpath = extract::Path("folder".to_string());
@@ -63,7 +62,6 @@ async fn folder_return_type_test() {
 async fn file_return_type_test() {
         // if the path is a file the response headers will contain the content type of the file
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let params = Params::default();
     let subpath = extract::Path("penguins.jpg".to_string());
@@ -89,7 +87,6 @@ async fn sha256_digest(body: &mut UnsyncBoxBody<Bytes, axum::Error>) -> anyhow::
 async fn file_return_checksum_test() {
     // if the path is a file the endpoint will return the content of the file
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let params = Params::default();
     let subpath = extract::Path("penguins.jpg".to_string());
@@ -109,7 +106,6 @@ async fn file_return_checksum_test() {
 async fn not_exists_return_type_test() {
     // if the path doesn't exist the endpoint will return a 404 error code
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let params = Params::default();
     let subpath = extract::Path("not_exists".to_string());
@@ -128,7 +124,6 @@ async fn not_exists_return_type_test() {
 async fn file_download_name_test(#[case] filename: &str) {
     // if the path is a file the browser will download the file with the correct name
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let params = Params::default();
 
@@ -167,7 +162,6 @@ async fn lower_max_width_test(#[case] thumbnail: Option<bool>) {
 
     let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let params = Params { 
         max_width: Some(200),
@@ -194,7 +188,6 @@ async fn higher_max_width_test(#[case] thumbnail: Option<bool>) {
 
     let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let params = Params { 
         max_width: Some(500),
@@ -222,7 +215,6 @@ async fn lower_max_height_test(#[case] thumbnail: Option<bool>) {
 
     let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let params = Params { 
         max_width: None,
@@ -253,7 +245,6 @@ async fn higher_max_height_test(#[case] thumbnail: Option<bool>) {
 
     let filename = "penguins.jpg";  // penguins.jpg has 96 DPI
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let params = Params { 
         max_width: None,

@@ -5,10 +5,17 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+
+[[bin]]
+name = "fotos-backend"
+path = "src/main.rs"
+
 [features]
 turbojpeg = ["dep:turbojpeg"]
 
 [dependencies]
+test-macro = { path = "test-macro" }
 anyhow = "1.0"
 axum = { version = "0.6", features = [ "query", "tokio" ] }
 bytes = "1"

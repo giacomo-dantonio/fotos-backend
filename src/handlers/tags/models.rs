@@ -7,4 +7,15 @@ pub struct Tag {
     pub tagname: String
 }
 
-// FIXME: add models for files and mapping them to tags
+#[derive(Clone, Deserialize, Debug, FromRow, Serialize)]
+pub struct File {
+    pub id: String,
+    pub relative_path: String,
+    pub csum: String
+}
+
+#[derive(Clone, Deserialize, Debug, FromRow, Serialize)]
+pub struct FileTags {
+    pub tag_id: String,
+    pub file_id: String
+}

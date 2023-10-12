@@ -3,14 +3,13 @@ use rstest::rstest;
 
 use crate::{
     handlers::tags::models::Tag,
-    test_utils::{setup, make_state, insert_tags}
+    test_utils::{make_state, insert_tags}
 };
 
 #[tokio::test]
 async fn test_get_tags() {
     // the endpoint without query parameters will return all tags
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let tagnames = [
         "Landscape".to_string(),
@@ -41,7 +40,6 @@ async fn test_query_tags() {
     // the endpoint with a query parameter will filter the tags
     // according to the search string
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let tagnames = vec![
         "Landscape".to_string(),
@@ -79,7 +77,6 @@ async fn test_create_tag(#[case] duplicate: bool) {
     // if not already there.
 
     let state = make_state().await;
-    setup(&state.pool).await;
 
     let tagname = "next_tag";
     let existing_tags = if duplicate {

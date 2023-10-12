@@ -8,11 +8,17 @@ use crate::{AppState, AppConf, infrastructure};
 
 static DB_URL: &str = "sqlite://test.db";
 
-pub async fn setup(pool: &SqlitePool) {
+pub async fn setup_pool() -> SqlitePool {
     infrastructure::ensure_db::<Sqlite>(DB_URL).await
         .expect("Unable to create test database");
-    infrastructure::migrate(pool).await
-        .expect("Database migration failed")
+
+    let pool = SqlitePool::connect(DB_URL)
+        .await
+        .expect("Cannot open DB pool");
+    infrastructure::migrate(&pool).await
+        .expect("Database migration failed");
+    
+    pool
 }
 
 pub async fn make_state() -> State<Arc<AppState>> {
@@ -26,9 +32,7 @@ pub async fn make_state() -> State<Arc<AppState>> {
         max_level: "DEBUG".to_string()
     };
 
-    let pool = SqlitePool::connect(DB_URL)
-        .await
-        .unwrap();
+    let pool = setup_pool().await;
     let state = AppState {
         conf,
         pool
